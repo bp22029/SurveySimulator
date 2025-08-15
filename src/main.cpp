@@ -6,87 +6,101 @@
 #include "../include/data_loader.hpp"
 #include "../include/prompt_generator.hpp"
 #include "llama.h"
+#include <iostream>
+#include "httplib.h"
+#include "nlohmann/json.hpp"
+
+// nlohmann/jsonを使いやすくするために名前空間を指定
+using json = nlohmann::json;
 
 int main() {
     srand(static_cast<unsigned int>(time(nullptr)));
 
-    std::cout << "=== CSVファイル読み込みテスト ===" << std::endl;
-
-    // 1. 合成人口データの読み込みテスト
-    std::cout << "\n1. 合成人口データの読み込み..." << std::endl;
+    // 合成人口データの読み込み
     std::vector<Person> population = readSyntheticPopulation("../data/sample_synthetic_population.csv");
-
     if (population.empty()) {
-        std::cout << "エラー: 合成人口データが読み込めませんでした" << std::endl;
-    } else {
-        std::cout << "読み込み成功: " << population.size() << "人のデータ" << std::endl;
-
-        for (int i = 0; i < std::min(3, static_cast<int>(population.size())); ++i) {
-            const Person& p = population[i];
-            std::cout << "\n人物" << (i+1) << ":" << std::endl;
-            std::cout << "  ID: " << p.id << std::endl;
-            std::cout << "  性別: " << p.gender << std::endl;
-            std::cout << "  年齢: " << p.age << "歳" << std::endl;
-            std::cout << "  住所: " << p.address << std::endl;
-            std::cout << "  職業: " << p.industry << std::endl;
-            std::cout << "  世帯構成: " << p.household_composition << std::endl;
-            std::cout << "  月収: " << p.monthly_income << "円" << std::endl;
-            std::cout << "  性格特性:" << std::endl;
-            printf("    神経症傾向: %.2f\n", p.personality.neuroticism);
-            printf("    誠実性: %.2f\n", p.personality.conscientiousness);
-            printf("    外向性: %.2f\n", p.personality.extraversion);
-            printf("    協調性: %.2f\n", p.personality.agreeableness);
-            printf("    開放性: %.2f\n", p.personality.openness);
-        }
+        return 1;
     }
 
-    // 2. 質問データの読み込みテスト
-    std::cout << "\n\n2. 質問データの読み込み..." << std::endl;
+    // 質問データの読み込み
     std::vector<Question> questions = readQuestions("../data/ssm2015.csv");
-
     if (questions.empty()) {
-        std::cout << "エラー: 質問データが読み込めませんでした" << std::endl;
-    } else {
-        std::cout << "読み込み成功: " << questions.size() << "個の質問" << std::endl;
-
-        for (int i = 0; i < std::min(2, static_cast<int>(questions.size())); ++i) {
-            const Question& q = questions[i];
-            std::cout << "\n質問" << (i+1) << " [" << q.id << "]:" << std::endl;
-            std::cout << q.text << std::endl;
-            std::cout << "選択肢:" << std::endl;
-            for (const auto& choice : q.choices) {
-                std::cout << "  " << choice << std::endl;
-            }
-        }
+        return 1;
     }
 
-    // 3. プロンプトテンプレートの読み込みテスト
-    std::cout << "\n\n3. プロンプトテンプレートの読み込み..." << std::endl;
+    // プロンプトテンプレートの読み込み
     std::ifstream template_file("../data/prompt_template.txt");
     std::string prompt_template;
-
     if (template_file.is_open()) {
         std::string line;
         while (std::getline(template_file, line)) {
             prompt_template += line + "\n";
         }
         template_file.close();
-        std::cout << "テンプレート読み込み成功" << std::endl;
     } else {
-        std::cout << "エラー: プロンプトテンプレートが読み込めませんでした" << std::endl;
+        return 1;
     }
 
-    // 4. プロンプト生成テスト
+    std::string generated_prompt;
+    // プロンプト生成
     if (!population.empty() && !questions.empty() && !prompt_template.empty()) {
-        std::cout << "\n\n4. プロンプト生成テスト..." << std::endl;
-
-        std::string generated_prompt = generatePrompt(prompt_template, population[0], questions[0]);
-
-        std::cout << "=== 生成されたプロンプト ===" << std::endl;
-        std::cout << generated_prompt << std::endl;
-        std::cout << "=========================" << std::endl;
+        generated_prompt = generatePrompt(prompt_template, population[0], questions[0]);
     }
 
-    std::cout << "\n=== テスト完了 ===" << std::endl;
+
+    // 1. 接続先のサーバーを指定
+    // 同じPCでサーバーを動かしているので "localhost" を指定します
+    //httplib::Client cli("localhost", 8080);
+    //LM Studioのサーバーに接続する場合は、以下のようにIPアドレスとポートを指定します。
+    httplib::Client cli("127.0.0.1", 1234);
+
+    // タイムアウトを10分 (600秒) に設定。これでほとんどのモデルで大丈夫なはずです。
+    cli.set_connection_timeout(60); // 接続タイムアウト
+    cli.set_read_timeout(120);       // 読み取りタイムアウト ★これを追加！
+    cli.set_write_timeout(60);      // 書き込みタイムアウト ★これを追加！
+
+
+    // 2. サーバーに送るリクエスト内容をJSONで作成
+    json request_body;
+    request_body["model"] = "openai/gpt-oss-20b"; // モデル名は任意です
+
+    request_body["messages"] = json::array({
+    {{"role", "system"}, {"content", "あなたは社会調査の回答者です。与えられた属性に基づいて自然に回答してください。"}},
+    {{"role", "user"}, {"content", generated_prompt}}
+    });
+
+    //request_body["temperature"] = 0.2;
+    request_body["stream"] = false; // まずは一括で結果を受け取る
+
+    std::cout << "サーバーにリクエストを送信します..." << std::endl;
+
+    // 3. "/v1/chat/completions"エンドポイントにPOSTリクエストを送信
+    auto res = cli.Post("/v1/chat/completions", request_body.dump(), "application/json");
+
+    // 4. サーバーからの応答を処理
+    if (res && res->status == 200) {
+        std::cout << "サーバーから応答を受け取りました。" << std::endl;
+
+        // レスポンスのJSONデータを解析
+        json response_json = json::parse(res->body);
+
+        // 生成されたテキストを取得して表示
+        std::string content = response_json["choices"][0]["message"]["content"];
+
+        std::cout << "\n--- AIの応答 ---\n" << std::endl;
+        std::cout << content << std::endl;
+
+    } else {
+        std::cerr << "エラー: リクエストが失敗しました。" << std::endl;
+        if(res) {
+            std::cerr << "ステータスコード: " << res->status << std::endl;
+            std::cerr << "応答内容: " << res->body << std::endl;
+        } else {
+            auto err = res.error();
+            std::cerr << "HTTPエラー: " << httplib::to_string(err) << std::endl;
+        }
+        return 1;
+    }
+
     return 0;
 }
