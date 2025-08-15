@@ -9,11 +9,10 @@
 #include "httplib.h"
 #include "nlohmann/json.hpp"
 #include "llm_client.hpp"
+#include "survey_results.hpp"
 
 // nlohmann/jsonを使いやすくするために名前空間を指定
 using json = nlohmann::json;
-
-
 
 int main() {
     srand(static_cast<unsigned int>(time(nullptr)));
@@ -50,8 +49,13 @@ int main() {
     }
 
 
-    std::string content = queryLLM(generated_prompt);
-    std::cout << content << std::endl;
+    //std::string content = queryLLM(generated_prompt);
+    //std::cout << content << std::endl;
+
+    std::vector<SurveyResult> results;
+    initializeSurveyResults(results,questions);
+
+
 
     return 0;
 }

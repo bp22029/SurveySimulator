@@ -29,6 +29,7 @@ add_executable(SurveySimulator src/main.cpp
         src/data_loader.cpp
         src/prompt_generator.cpp
         src/llm_client.cpp
+        src/survey_results.cpp
 )
 
 target_include_directories(SurveySimulator PRIVATE
