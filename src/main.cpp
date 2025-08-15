@@ -14,6 +14,7 @@
 // nlohmann/jsonを使いやすくするために名前空間を指定
 using json = nlohmann::json;
 
+
 int main() {
     srand(static_cast<unsigned int>(time(nullptr)));
 
@@ -30,17 +31,9 @@ int main() {
     }
 
     // プロンプトテンプレートの読み込み
-    std::ifstream template_file("../data/prompt_template.txt");
-    std::string prompt_template;
-    if (template_file.is_open()) {
-        std::string line;
-        while (std::getline(template_file, line)) {
-            prompt_template += line + "\n";
-        }
-        template_file.close();
-    } else {
-        return 1;
-    }
+    std::string prompt_template = readPromptTemplate();
+
+
 
     std::string generated_prompt;
     // プロンプト生成
@@ -49,11 +42,11 @@ int main() {
     }
 
 
-    //std::string content = queryLLM(generated_prompt);
-    //std::cout << content << std::endl;
+    std::string content = queryLLM(generated_prompt);
+    std::cout << content << std::endl;
 
-    std::vector<SurveyResult> results;
-    initializeSurveyResults(results,questions);
+    //std::vector<SurveyResult> results;
+    //initializeSurveyResults(results,questions);
 
 
 

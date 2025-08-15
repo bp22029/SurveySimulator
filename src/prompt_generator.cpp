@@ -4,6 +4,21 @@
 #include "../include/prompt_generator.hpp"
 #include <cstdio>
 
+std::string readPromptTemplate() {
+    std::ifstream template_file("../data/prompt_template.txt");
+    std::string prompt_template;
+    if (template_file.is_open()) {
+        std::string line;
+        while (std::getline(template_file, line)) {
+            prompt_template += line + "\n";
+        }
+        template_file.close();
+        return prompt_template;
+    } else {
+        return "";
+    }
+}
+
 void replaceAll(std::string& str, const std::string& placeholder, const std::string& value) {
     size_t pos = 0;
     while ((pos = str.find(placeholder, pos)) != std::string::npos) {

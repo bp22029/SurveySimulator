@@ -4,6 +4,12 @@
 #include <string>
 #include "person.hpp"
 #include "question.hpp"
+#include <vector>
+#include <fstream>
+#include <sstream>
+
+// プロンプトテンプレートを読み込む関数
+std::string readPromptTemplate();
 
 // プロンプト生成関数
 std::string generatePrompt(const std::string& template_str, const Person& person, const Question& question);
