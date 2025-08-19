@@ -14,4 +14,6 @@ struct SurveyResult {
 
 void initializeSurveyResults(std::vector<SurveyResult>& results,const std::vector<Question>& questions);
 
+void parseAndRecordAnswer(const std::string& response_str, const Question& question, SurveyResult& result);
+
 #endif
