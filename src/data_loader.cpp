@@ -6,13 +6,19 @@
 #include <sstream>
 #include <iostream>
 #include <cstdlib>
+#include <random>
+#include <chrono>
 
 void randomBigFive(Person& person) {
-    person.personality.neuroticism = static_cast<float>(rand()) / RAND_MAX;
-    person.personality.conscientiousness = static_cast<float>(rand()) / RAND_MAX;
-    person.personality.extraversion = static_cast<float>(rand()) / RAND_MAX;
-    person.personality.agreeableness = static_cast<float>(rand()) / RAND_MAX;
-    person.personality.openness = static_cast<float>(rand()) / RAND_MAX;
+    static std::random_device rd;
+    static std::mt19937 gen(rd());
+    static std::uniform_real_distribution<float> dis(0.0f, 1.0f);
+
+    person.personality.neuroticism = dis(gen);
+    person.personality.conscientiousness = dis(gen);
+    person.personality.extraversion = dis(gen);
+    person.personality.agreeableness = dis(gen);
+    person.personality.openness = dis(gen);
 }
 
 std::vector<Person> readSyntheticPopulation(const std::string& filename) {

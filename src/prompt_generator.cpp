@@ -3,6 +3,7 @@
 //
 #include "../include/prompt_generator.hpp"
 #include <cstdio>
+#include <iostream>
 
 std::string readPromptTemplate() {
     std::ifstream template_file("../data/prompt_template.txt");

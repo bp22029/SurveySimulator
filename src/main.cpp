@@ -16,7 +16,6 @@ using json = nlohmann::json;
 
 
 int main() {
-    srand(static_cast<unsigned int>(time(nullptr)));
 
     // 合成人口データの読み込み
     std::vector<Person> population = readSyntheticPopulation("../data/sample_synthetic_population.csv");
@@ -41,9 +40,12 @@ int main() {
         generated_prompt = generatePrompt(prompt_template, population[0], questions[0]);
     }
 
+     std::cout << "生成されたプロンプト:\n" << generated_prompt << std::endl;
 
-    std::string content = queryLLM(generated_prompt);
-    std::cout << content << std::endl;
+    // for (int i=0;i<10;i++) {
+    //     std::string content = queryLLM(generated_prompt);
+    //     std::cout << content << std::endl;
+    // }
 
     //std::vector<SurveyResult> results;
     //initializeSurveyResults(results,questions);
