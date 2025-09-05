@@ -1,14 +1,16 @@
 #include <iostream>
 #include <fstream>
-#include <cstdlib>
-#include <ctime>
-#include <algorithm>
+#include <vector>
+#include <string>
+#include <map>
+#include <sstream>
 #include "../include/data_loader.hpp"
 #include "../include/prompt_generator.hpp"
 #include "httplib.h"
 #include "nlohmann/json.hpp"
 #include "llm_client.hpp"
 #include "survey_results.hpp"
+#include "simulation_runner.hpp"
 
 // nlohmann/jsonを使いやすくするために名前空間を指定
 using json = nlohmann::json;
@@ -17,7 +19,7 @@ using json = nlohmann::json;
 
 
 int main() {
-    srand(static_cast<unsigned int>(time(nullptr)));
+
 
     // 合成人口データの読み込み
     std::vector<Person> population = readSyntheticPopulation("../data/sample_synthetic_population.csv");
@@ -41,26 +43,8 @@ int main() {
     // プロジェクトを書き込む変数を定義
     std::string generated_prompt;
 
-    int total_simulations = population.size() * questions.size();
-    int current_count = 0;
-    for (const auto& person : population) {
-
-        for (int i = 0; i < questions.size(); ++i) {
-            current_count++;
-            std::cout << "\n[" << current_count << "/" << total_simulations << "] "
-                      << "Agent ID: " << person.id << ", Question ID: " << questions[i].id << std::endl;
-
-            // プロンプト生成
-            generated_prompt = generatePrompt(prompt_template, person, questions[i]);
-
-            //　LLM問い合わせ、質問回答
-            std::string content = queryLLM(generated_prompt);
-            std::cout << content << std::endl;
-
-            //　回答の解析と集計
-            parseAndRecordAnswer(content, questions[i], results[i]);
-        }
-    }
+    // 4. シミュレーションの実行
+    runSurveySimulation(population, questions, prompt_template, results);
 
     // 5. 集計結果のCSVファイルへの書き込み
     std::ofstream csv_file("../data/survey_results.csv");

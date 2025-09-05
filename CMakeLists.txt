@@ -30,6 +30,7 @@ add_executable(SurveySimulator src/main.cpp
         src/prompt_generator.cpp
         src/llm_client.cpp
         src/survey_results.cpp
+        src/simulation_runner.cpp
 )
 
 target_include_directories(SurveySimulator PRIVATE
@@ -38,7 +39,3 @@ target_include_directories(SurveySimulator PRIVATE
 )
 
 target_include_directories(SurveySimulator PUBLIC include)
-
-add_subdirectory(../llama.cpp llama_cpp_build)
-
-target_link_libraries(SurveySimulator PRIVATE llama)
