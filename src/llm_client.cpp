@@ -25,7 +25,7 @@ std::string queryLLM(const std::string& prompt) {
 
     // タイムアウトを10分 (600秒) に設定。これでほとんどのモデルで大丈夫なはずです。
     cli.set_connection_timeout(60); // 接続タイムアウト
-    cli.set_read_timeout(120);       // 読み取りタイムアウト ★これを追加！
+    cli.set_read_timeout(600);       // 読み取りタイムアウト ★これを追加！
     cli.set_write_timeout(60);      // 書き込みタイムアウト ★これを追加！
 
 
@@ -37,13 +37,17 @@ std::string queryLLM(const std::string& prompt) {
     request_body["model"] = "hugging-quants/Meta-Llama-3.1-8B-Instruct-AWQ-INT4";
 
     request_body["messages"] = json::array({
-    {{"role", "system"}, {"content", "あなたは社会調査の回答者です。プロフィールに基づいて自然に回答してください。"}},
+    {{"role", "system"}, {"content", "あなたは社会調査の回答者です。思考プロセスと最終的な回答を指定されたJSON形式で出力してください。"}},
     {{"role", "user"}, {"content", prompt}}
     });
 
-    //request_body["temperature"] = 0.2;
+    request_body["temperature"] = 0.1;
     request_body["seed"] = 42; // 乱数シードを固定して、同じプロンプトで同じ応答が得られるようにする
     request_body["stream"] = false; // まずは一括で結果を受け取る
+    request_body["max_tokens"] = 1024; // 例えば1024トークンに制限
+
+    // ★★★ 繰り返しを抑制するペナルティを追加 ★★★
+    request_body["repetition_penalty"] = 1.1;
 
     std::cout << "サーバーにリクエストを送信します..." << std::endl;
 
