@@ -36,6 +36,8 @@ std::string generatePrompt(const std::string& template_str, const Person& person
     replaceAll(prompt, "{住所}", person.address);
     replaceAll(prompt, "{年齢}", std::to_string(person.age));
     replaceAll(prompt, "{職業分類}", person.industry);
+    replaceAll(prompt, "{雇用形態}", person.employment_type);
+    replaceAll(prompt,"{企業規模}", person.company_size);
     replaceAll(prompt, "{世帯構成}", person.household_composition);
     replaceAll(prompt, "{世帯での役割}", person.household_role);
     replaceAll(prompt, "{月収}", std::to_string(person.monthly_income));

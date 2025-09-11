@@ -73,7 +73,7 @@ void runSurveySimulation(const std::vector<Person>& population,
         question_ids.push_back(q.id);
     }
     // CSVエクスポート
-    responseManager.exportToCSV("../data/individual_responses.csv", question_ids);
+    responseManager.exportToCSV("../results/individual_responses.csv", question_ids);
     responseManager.printSummary();
 
     // person = population[1]; //デバッグ用に2人目

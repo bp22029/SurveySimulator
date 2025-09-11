@@ -21,6 +21,8 @@ struct Person {
     std::string industry;
     std::string household_composition;
     std::string household_role;
+    std::string employment_type;
+    std::string company_size;
     int monthly_income;
     BigFive personality;
 };

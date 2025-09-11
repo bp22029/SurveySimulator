@@ -16,4 +16,6 @@ void initializeSurveyResults(std::vector<SurveyResult>& results,const std::vecto
 
 void parseAndRecordAnswer(const std::string& response_str, const Question& question, SurveyResult& result);
 
+void exportSurveyResultsToCSV(const std::vector<SurveyResult>& results, const std::string& filename);
+
 #endif

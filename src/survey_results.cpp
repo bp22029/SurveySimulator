@@ -8,6 +8,11 @@
 #include "../include/question.hpp"
 #include <vector>
 #include <map>
+#include <fstream>
+#include <string>
+#include "httplib.h"
+#include "nlohmann/json.hpp"
+
 
 void initializeSurveyResults(std::vector<SurveyResult>& results,const std::vector<Question>& questions) {
     // 1. 集計用ベクターの初期化
@@ -46,4 +51,33 @@ void parseAndRecordAnswer(const std::string& response_str, const Question& quest
         // こちらも無効回答としてカウント
         // result.invalid_count++;
     }
+}
+
+void exportSurveyResultsToCSV(const std::vector<SurveyResult>& results, const std::string& filename) {
+    std::ofstream csv_file(filename);
+    if (!csv_file.is_open()) {
+        std::cerr << "CSVファイルのオープンに失敗しました: " << filename << std::endl;
+        return;
+    }
+
+    // ヘッダー行の書き込み
+    csv_file << "question_id,full_question_text,choice_1_count,choice_2_count,choice_3_count,choice_4_count,choice_5_count\n";
+
+    for (const auto& result : results) {
+        // 質問IDと質問文を書き込む
+        csv_file << result.question_id << ",\"" << result.question_text << "\"";
+
+        // 選択肢のカウントを書き込む（最大5列）
+        for (int i = 1; i <= 5; ++i) {
+            csv_file << ",";
+            auto it = result.answer_counts.find(i);
+            if (it != result.answer_counts.end()) {
+                csv_file << it->second;
+            }
+        }
+        csv_file << "\n";
+    }
+
+    csv_file.close();
+    std::cout << "集計結果をCSVファイルに書き込みました: " << filename << std::endl;
 }

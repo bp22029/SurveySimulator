@@ -56,6 +56,8 @@ std::vector<Person> readSyntheticPopulation(const std::string& filename) {
             person.industry = fields[14];
             person.household_composition = fields[4];
             person.household_role = fields[12];
+            person.employment_type = fields[16];
+            person.company_size = fields[18];
 
             if (fields.size() > 19 && !fields[19].empty()) {
                 person.monthly_income = std::stoi(fields[19]);
