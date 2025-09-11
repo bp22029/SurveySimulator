@@ -14,16 +14,16 @@ struct BigFive {
 
 // 一人の人間を表す構造体
 struct Person {
-    int id;
+    int person_id;
     std::string gender;
-    std::string address;
+    std::string prefecture_name;
     int age;
-    std::string industry;
-    std::string household_composition;
-    std::string household_role;
+    std::string industry_type;
+    std::string family_type;
+    std::string role_household_type;
     std::string employment_type;
     std::string company_size;
-    int monthly_income;
+    int total_income;
     BigFive personality;
 };
 

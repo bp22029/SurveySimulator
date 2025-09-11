@@ -63,3 +63,59 @@ void IndividualResponseManager::printSummary() const {
         std::cout << "Person[" << person_id << "]: " << response.responses.size() << "問回答済み" << std::endl;
     }
 }
+
+void IndividualResponseManager::exportMergedPopulationCSV(const std::string& filename,
+                                                         const std::vector<Person>& population,
+                                                         const std::vector<std::string>& question_ids) const {
+    std::ofstream file(filename);
+    if (!file.is_open()) {
+        std::cerr << "CSVファイルを開けません: " << filename << std::endl;
+        return;
+    }
+
+    // ヘッダー行を出力
+    file << "person_id,prefecture_name,age,industry_type,employment_type,company_size,"
+         << "family_type,role_household_type,total_income,neuroticism,conscientiousness,"
+         << "extraversion,agreeableness,openness";
+
+    for (const auto& qid : question_ids) {
+        file << "," << qid;
+    }
+    file << "\n";
+
+    // 各人物のデータを出力
+    for (const auto& person : population) {
+        // 基本情報
+        file << person.person_id << ","
+             << person.prefecture_name << ","
+             << person.age << ","
+             << person.industry_type << ","
+             << person.employment_type << ","
+             << person.company_size << ","
+             << person.family_type << ","
+             << person.role_household_type << ","
+             << person.total_income << ","
+             << person.personality.neuroticism << ","
+             << person.personality.conscientiousness << ","
+             << person.personality.extraversion << ","
+             << person.personality.agreeableness << ","
+             << person.personality.openness;
+
+        // 回答データ
+        auto response_it = person_responses.find(person.person_id);
+        for (const auto& qid : question_ids) {
+            file << ",";
+            if (response_it != person_responses.end()) {
+                auto answer_it = response_it->second.responses.find(qid);
+                if (answer_it != response_it->second.responses.end()) {
+                    file << answer_it->second;
+                }
+                // 回答がない場合は空欄
+            }
+        }
+        file << "\n";
+    }
+
+    file.close();
+    std::cout << "統合データをCSVに出力しました: " << filename << std::endl;
+}

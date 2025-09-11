@@ -49,20 +49,20 @@ std::vector<Person> readSyntheticPopulation(const std::string& filename) {
 
         if (fields.size() >= 15) {
             Person person;
-            person.id = std::stoi(fields[7]);
+            person.person_id = std::stoi(fields[7]);
             person.gender = fields[10];
-            person.address = fields[1];
+            person.prefecture_name = fields[1];
             person.age = std::stoi(fields[8]);
-            person.industry = fields[14];
-            person.household_composition = fields[4];
-            person.household_role = fields[12];
+            person.industry_type = fields[14];
+            person.family_type = fields[4];
+            person.role_household_type = fields[12];
             person.employment_type = fields[16];
             person.company_size = fields[18];
 
             if (fields.size() > 19 && !fields[19].empty()) {
-                person.monthly_income = std::stoi(fields[19]);
+                person.total_income = std::stoi(fields[19]);
             } else {
-                person.monthly_income = 0;
+                person.total_income = 0;
             }
 
             randomBigFive(person);

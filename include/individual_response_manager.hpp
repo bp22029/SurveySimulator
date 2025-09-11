@@ -6,6 +6,7 @@
 #include <map>
 #include <string>
 #include "individual_responses.hpp"
+#include "person.hpp"
 
 class IndividualResponseManager {
 private:
@@ -16,6 +17,9 @@ public:
     IndividualResponse getPersonResponses(int person_id) const;
     void exportToCSV(const std::string& filename, const std::vector<std::string>& question_ids) const;
     void printSummary() const;
+    void exportMergedPopulationCSV(const std::string& filename,
+                                   const std::vector<Person>& population,
+                                   const std::vector<std::string>& question_ids) const;
 };
 
 #endif // INDIVIDUAL_RESPONSE_MANAGER_HPP

@@ -40,7 +40,6 @@ int main() {
     std::vector<SurveyResult> results;
     initializeSurveyResults(results,questions);
 
-
     // 4. シミュレーションの実行
     runSurveySimulation(population, questions, prompt_template, results);
 
