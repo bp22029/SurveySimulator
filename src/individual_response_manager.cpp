@@ -74,7 +74,7 @@ void IndividualResponseManager::exportMergedPopulationCSV(const std::string& fil
     }
 
     // ヘッダー行を出力
-    file << "person_id,prefecture_name,age,industry_type,employment_type,company_size,"
+    file << "person_id,gender,prefecture_name,age,industry_type,employment_type,company_size,"
          << "family_type,role_household_type,total_income,neuroticism,conscientiousness,"
          << "extraversion,agreeableness,openness";
 
@@ -87,6 +87,7 @@ void IndividualResponseManager::exportMergedPopulationCSV(const std::string& fil
     for (const auto& person : population) {
         // 基本情報
         file << person.person_id << ","
+             << person.gender << ","
              << person.prefecture_name << ","
              << person.age << ","
              << person.industry_type << ","
