@@ -4,6 +4,6 @@
 #include <string>
 
 //LLMに問い合わせを行う
-std::string queryLLM(const std::string& prompt);
+std::string queryLLM(const std::string& prompt,const std::string& host, int port);
 
 #endif

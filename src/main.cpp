@@ -41,7 +41,8 @@ int main() {
     initializeSurveyResults(results,questions);
 
     // 4. シミュレーションの実行
-    runSurveySimulation(population, questions, prompt_template, results);
+    //runSurveySimulation(population, questions, prompt_template, results);
+    runSurveySimulation_Parallel(population, questions, prompt_template, results, 64); // 64スレッドで実行
 
 
 
