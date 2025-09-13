@@ -13,7 +13,7 @@
 using json = nlohmann::json;
 
 
-std::string queryLLM(const std::string& prompt) {
+std::string queryLLM(const std::string& prompt,const std::string& host, int port) {
 
     // 1. 接続先のサーバーを指定
     // 同じPCでサーバーを動かしているので "localhost" を指定します
@@ -21,7 +21,11 @@ std::string queryLLM(const std::string& prompt) {
     //LM Studioのサーバーに接続する場合は、以下のようにIPアドレスとポートを指定します。
     //httplib::Client cli("127.0.0.1", 1234);
 
-    httplib::Client cli("127.0.0.1",8000);
+    //　vLLMサーバーに接続する場合
+    //httplib::Client cli("127.0.0.1",8000);
+
+    //GPU2枚構成のvLLMサーバーに接続する場合
+    httplib::Client cli(host,port);
 
     // タイムアウトを10分 (600秒) に設定。これでほとんどのモデルで大丈夫なはずです。
     cli.set_connection_timeout(60); // 接続タイムアウト
@@ -49,14 +53,14 @@ std::string queryLLM(const std::string& prompt) {
     // ★★★ 繰り返しを抑制するペナルティを追加 ★★★
     request_body["repetition_penalty"] = 1.1;
 
-    std::cout << "サーバーにリクエストを送信します..." << std::endl;
+    //std::cout << "サーバーにリクエストを送信します..." << std::endl;
 
     // 3. "/v1/chat/completions"エンドポイントにPOSTリクエストを送信
     auto res = cli.Post("/v1/chat/completions", request_body.dump(), "application/json");
 
     // 4. サーバーからの応答を処理
     if (res && res->status == 200) {
-        std::cout << "サーバーから応答を受け取りました。" << std::endl;
+        //std::cout << "サーバーから応答を受け取りました。" << std::endl;
 
         // レスポンスのJSONデータを解析
         json response_json = json::parse(res->body);
@@ -64,7 +68,7 @@ std::string queryLLM(const std::string& prompt) {
         // 生成されたテキストを取得して表示
         std::string content = response_json["choices"][0]["message"]["content"];
 
-        std::cout << "\n--- AIの応答 ---\n" << std::endl;
+        //std::cout << "\n--- AIの応答 ---\n" << std::endl;
         return content;
 
     } else {

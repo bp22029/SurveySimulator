@@ -33,6 +33,8 @@ add_executable(SurveySimulator src/main.cpp
         src/simulation_runner.cpp
         src/response_parser.cpp
         src/individual_response_manager.cpp
+        include/ThreadSafeQueue.hpp
+        src/thread_worker.cpp
 )
 
 target_include_directories(SurveySimulator PRIVATE
