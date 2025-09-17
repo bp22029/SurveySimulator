@@ -51,7 +51,7 @@ std::string queryLLM(const std::string& prompt,const std::string& host, int port
     request_body["max_tokens"] = 1024; // 例えば1024トークンに制限
 
     // ★★★ 繰り返しを抑制するペナルティを追加 ★★★
-    request_body["repetition_penalty"] = 1.1;
+    request_body["repetition_penalty"] = 1.2;
 
     //std::cout << "サーバーにリクエストを送信します..." << std::endl;
 

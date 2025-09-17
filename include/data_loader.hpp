@@ -9,6 +9,7 @@
 // CSVデータ読み込み関数
 std::vector<Person> readSyntheticPopulation(const std::string& filename);
 std::vector<Question> readQuestions(const std::string& filename);
+std::string unquoteString(const std::string& input_str);
 
 // Big Five性格特性のランダム生成
 void randomBigFive(Person& person);

@@ -17,6 +17,7 @@ struct Person {
     int person_id;
     std::string gender;
     std::string prefecture_name;
+    std::string city_name;
     int age;
     std::string industry_type;
     std::string family_type;
