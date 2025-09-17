@@ -20,6 +20,7 @@ public:
     void exportMergedPopulationCSV(const std::string& filename,
                                    const std::vector<Person>& population,
                                    const std::vector<std::string>& question_ids) const;
+    const IndividualResponse* findPersonResponses(int person_id) const;
 };
 
 #endif // INDIVIDUAL_RESPONSE_MANAGER_HPP

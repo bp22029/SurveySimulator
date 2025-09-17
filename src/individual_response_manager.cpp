@@ -23,6 +23,14 @@ IndividualResponse IndividualResponseManager::getPersonResponses(int person_id) 
     return IndividualResponse{person_id, {}};
 }
 
+const IndividualResponse* IndividualResponseManager::findPersonResponses(int person_id) const {
+    auto it = person_responses.find(person_id);
+    if (it != person_responses.end()) {
+        return &(it->second); // 見つかったオブジェクトのアドレスを返す
+    }
+    return nullptr; // 見つからなければヌルポインタ
+}
+
 void IndividualResponseManager::exportToCSV(const std::string& filename, const std::vector<std::string>& question_ids) const {
     std::ofstream file(filename);
     if (!file.is_open()) {
@@ -74,7 +82,7 @@ void IndividualResponseManager::exportMergedPopulationCSV(const std::string& fil
     }
 
     // ヘッダー行を出力
-    file << "person_id,gender,prefecture_name,age,industry_type,employment_type,company_size,"
+    file << "person_id,gender,prefecture_name,city_name,age,industry_type,employment_type,company_size,"
          << "family_type,role_household_type,total_income,neuroticism,conscientiousness,"
          << "extraversion,agreeableness,openness";
 
@@ -89,6 +97,7 @@ void IndividualResponseManager::exportMergedPopulationCSV(const std::string& fil
         file << person.person_id << ","
              << person.gender << ","
              << person.prefecture_name << ","
+             << person.city_name << ","
              << person.age << ","
              << person.industry_type << ","
              << person.employment_type << ","
