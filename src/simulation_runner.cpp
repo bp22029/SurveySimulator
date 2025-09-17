@@ -19,10 +19,10 @@ void runSurveySimulation_Parallel(const std::vector<Person>& population,
                                  const std::vector<Question>& questions,
                                  const std::string& prompt_template,
                                  std::vector<SurveyResult>& results,
-                                 unsigned int num_threads = 64 ) { // スレッド数を引数で渡せるようにする
+                                 unsigned int num_threads,
+                                 IndividualResponseManager irm) { // スレッド数を引数で渡せるようにする
 
 
-    // --- ★追加点：サーバーリストとカウンターを定義 ---
     const std::vector<std::pair<std::string, int>> servers = {
         {"127.0.0.1", 8000},
         {"127.0.0.1", 8001}
@@ -31,7 +31,7 @@ void runSurveySimulation_Parallel(const std::vector<Person>& population,
 
     ThreadSafeQueue<SurveyTask> task_queue;
     ThreadSafeQueue<TaskResult> result_queue;
-    IndividualResponseManager responseManager;
+    //IndividualResponseManager responseManager;
     int total_simulations = population.size() * questions.size();
 
     // --- 1. 全てのタスクをタスクキューに投入 ---
@@ -46,6 +46,7 @@ void runSurveySimulation_Parallel(const std::vector<Person>& population,
     // --- 2. ワーカースレッドを起動 ---
     std::cout << "Starting " << num_threads << " worker threads for 2 GPUs..." << std::endl;
     std::vector<std::thread> threads;
+    // スレッド数分のワーカースレッドを起動
     for (unsigned int i = 0; i < num_threads; ++i) {
         threads.emplace_back(worker_function, std::cref(prompt_template), std::ref(task_queue), std::ref(result_queue),std::cref(servers), std::ref(request_counter));
     }
@@ -55,9 +56,9 @@ void runSurveySimulation_Parallel(const std::vector<Person>& population,
     for (int i = 0; i < total_simulations; ++i) {
         TaskResult result;
         result_queue.wait_and_pop(result); // 結果が来るまで待機
-        // ★修正点：結果の有効性をここでチェックする
+        //結果の有効性をチェックして記録
         if (result.choice_number != -1) {
-            responseManager.recordResponse(result.person_id, result.question_id, result.choice_number);
+            irm.recordResponse(result.person_id, result.question_id, result.choice_number);
         } else {
             // 解析に失敗したタスクをエラー出力
             std::cerr << "Error: Failed to parse response for Person ID: "
@@ -82,9 +83,9 @@ void runSurveySimulation_Parallel(const std::vector<Person>& population,
     for (const auto& q : questions) {
         question_ids.push_back(q.id);
     }
-    responseManager.exportToCSV("../results/individual_responses.csv", question_ids);
-    responseManager.printSummary();
-    responseManager.exportMergedPopulationCSV("../data/merged_population_responses.csv", population, question_ids);
+    irm.exportToCSV("../results/individual_responses.csv", question_ids);
+    irm.printSummary();
+    irm.exportMergedPopulationCSV("../data/merged_population_responses.csv", population, question_ids);
 
     std::cout << "Simulation finished." << std::endl;
 }

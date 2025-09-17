@@ -33,7 +33,7 @@ std::string generatePrompt(const std::string& template_str, const Person& person
     char buffer[32];
 
     replaceAll(prompt, "{性別}", person.gender);
-    replaceAll(prompt, "{住所}", person.prefecture_name);
+    replaceAll(prompt, "{住所}", person.prefecture_name+person.city_name);
     replaceAll(prompt, "{年齢}", std::to_string(person.age));
     replaceAll(prompt, "{職業分類}", person.industry_type);
     replaceAll(prompt, "{雇用形態}", person.employment_type);
