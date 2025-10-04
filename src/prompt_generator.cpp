@@ -42,19 +42,24 @@ std::string generatePrompt(const std::string& template_str, const Person& person
     replaceAll(prompt, "{世帯での役割}", person.role_household_type);
     replaceAll(prompt, "{月収}", std::to_string(person.total_income));
 
-    sprintf(buffer, "%.2f", person.personality.neuroticism);
+    snprintf(buffer, sizeof(buffer), "%.2f", person.personality.neuroticism);
+    //sprintf(buffer, "%.2f", person.personality.neuroticism);
     replaceAll(prompt, "{神経症傾向}", buffer);
 
-    sprintf(buffer, "%.2f", person.personality.conscientiousness);
+    snprintf(buffer, sizeof(buffer), "%.2f", person.personality.conscientiousness);
+    //sprintf(buffer, "%.2f", person.personality.conscientiousness);
     replaceAll(prompt, "{誠実性}", buffer);
 
-    sprintf(buffer, "%.2f", person.personality.extraversion);
+    snprintf(buffer, sizeof(buffer), "%.2f", person.personality.extraversion);
+    //sprintf(buffer, "%.2f", person.personality.extraversion);
     replaceAll(prompt, "{外向性}", buffer);
 
-    sprintf(buffer, "%.2f", person.personality.agreeableness);
+    snprintf(buffer, sizeof(buffer), "%.2f", person.personality.agreeableness);
+    //sprintf(buffer, "%.2f", person.personality.agreeableness);
     replaceAll(prompt, "{協調性}", buffer);
 
-    sprintf(buffer, "%.2f", person.personality.openness);
+    snprintf(buffer, sizeof(buffer), "%.2f", person.personality.openness);
+    //sprintf(buffer, "%.2f", person.personality.openness);
     replaceAll(prompt, "{開放性}", buffer);
 
     replaceAll(prompt, "{質問}", question.text);

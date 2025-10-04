@@ -7,4 +7,6 @@
 
 int extractChoiceNumber(const std::string& json_response);
 
+int parseLlmAnswer(const std::string& llmResponse);
+
 #endif // RESPONSE_PARSER_HPP

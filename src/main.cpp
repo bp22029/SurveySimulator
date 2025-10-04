@@ -12,8 +12,6 @@
 #include "survey_results.hpp"
 #include "simulation_runner.hpp"
 #include "individual_response_manager.hpp"
-#include "cross_tabulator_manager.hpp"
-#include "cross_tabulator.hpp"
 
 // nlohmann/jsonを使いやすくするために名前空間を指定
 using json = nlohmann::json;
@@ -44,9 +42,8 @@ int main() {
     initializeSurveyResults(results,questions);
 
     // 4. シミュレーションの実行
-    //runSurveySimulation(population, questions, prompt_template, results);
-    // IndividualResponseManager irm;
-    // runSurveySimulation_Parallel(population, questions, prompt_template, results, 64,irm); // 64スレッドで実行
+    runSurveySimulation(population, questions, prompt_template, results);
+    //runSurveySimulation_Parallel(population, questions, prompt_template, results, 64); // 64スレッドで実行
 
 
     // 5．csvからクロス集計を行う
