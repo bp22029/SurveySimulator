@@ -4,6 +4,10 @@
 // response_parser.cpp
 #include "response_parser.hpp"
 #include <iostream>
+#include <regex>    // 正規表現を扱うために必要
+#include <stdexcept> // std::stoi の例外処理のために必要
+#include <cctype>
+#include <string>
 
 using json = nlohmann::json;
 
@@ -24,4 +28,15 @@ int extractChoiceNumber(const std::string& json_response) {
     }
 
     return -1; // エラーの場合
+}
+
+int parseLlmAnswer(const std::string& llmResponse) {
+    // 最小限の安全なエラー処理: 空でないことと、最初の文字が数字であることを確認
+    if (llmResponse.empty() || !std::isdigit(static_cast<unsigned char>(llmResponse[0]))) {
+        std::cerr << "parseLlmAnswerエラー: 入力が1文字の数字ではありません。入力: " << llmResponse << std::endl;
+        return -1;
+    }
+
+    // 文字 '0' から '9' はASCIIコードで連続していることを利用して、高速に整数へ変換
+    return llmResponse[0] - '0';
 }

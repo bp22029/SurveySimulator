@@ -35,13 +35,14 @@ std::string queryLLM(const std::string& prompt,const std::string& host, int port
 
     // 2. サーバーに送るリクエスト内容をJSONで作成
     json request_body;
+    request_body["model"] = "openai/gpt-oss-120b";
     //request_body["model"] = "openai/gpt-oss-20b"; // モデル名は任意です
     //request_body["model"] = "meta-llama/Llama-2-7b-chat-hf"; // モデル名は任意です
 
-    request_body["model"] = "hugging-quants/Meta-Llama-3.1-8B-Instruct-AWQ-INT4";
+    //request_body["model"] = "hugging-quants/Meta-Llama-3.1-8B-Instruct-AWQ-INT4";
 
     request_body["messages"] = json::array({
-    {{"role", "system"}, {"content", "あなたは社会調査の回答者です。思考プロセスと最終的な回答を指定されたJSON形式で出力してください。"}},
+    {{"role", "system"}, {"content", "あなたは社会調査の回答者です。最終的な回答を出力してください。"}},
     {{"role", "user"}, {"content", prompt}}
     });
 
@@ -66,7 +67,21 @@ std::string queryLLM(const std::string& prompt,const std::string& host, int port
         json response_json = json::parse(res->body);
 
         // 生成されたテキストを取得して表示
-        std::string content = response_json["choices"][0]["message"]["content"];
+        std::string content;
+
+        // "content" が存在し、かつ null でないことを確認
+        if (response_json["choices"][0]["message"].contains("content") &&
+            !response_json["choices"][0]["message"]["content"].is_null())
+        {
+            // 安全な場合にのみ content を取り出す
+            content = response_json["choices"][0]["message"]["content"];
+        }
+        else
+        {
+            // content が null または存在しない場合の代替処理
+            content = "エラー：有効な応答がありませんでした。";
+            std::cerr << "Warning: LLM response content is null or missing." << std::endl;
+        }
 
         //std::cout << "\n--- AIの応答 ---\n" << std::endl;
         return content;
