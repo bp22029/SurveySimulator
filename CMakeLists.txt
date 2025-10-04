@@ -43,3 +43,6 @@ target_include_directories(SurveySimulator PRIVATE
 )
 
 target_include_directories(SurveySimulator PUBLIC include)
+
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /Zi")
+
