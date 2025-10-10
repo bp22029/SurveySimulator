@@ -35,6 +35,8 @@ add_executable(SurveySimulator src/main.cpp
         src/individual_response_manager.cpp
         include/ThreadSafeQueue.hpp
         src/thread_worker.cpp
+        src/cross_table_generator.cpp
+        include/cross_table_generator.hpp
 )
 
 target_include_directories(SurveySimulator PRIVATE
