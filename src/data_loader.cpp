@@ -14,12 +14,13 @@ void randomBigFive(Person& person) {
     static std::mt19937 gen(rd());
     static std::uniform_real_distribution<float> dis(0.0f, 1.0f);
 
-    person.personality.neuroticism = dis(gen);
-    person.personality.conscientiousness = dis(gen);
-    person.personality.extraversion = dis(gen);
-    person.personality.agreeableness = dis(gen);
-    person.personality.openness = dis(gen);
+    person.personality.neuroticism.score = dis(gen);
+    person.personality.conscientiousness.score = dis(gen);
+    person.personality.extraversion.score = dis(gen);
+    person.personality.agreeableness.score = dis(gen);
+    person.personality.openness.score = dis(gen);
 }
+
 
 std::vector<Person> readSyntheticPopulation(const std::string& filename) {
     std::vector<Person> population;

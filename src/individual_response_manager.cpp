@@ -105,11 +105,11 @@ void IndividualResponseManager::exportMergedPopulationCSV(const std::string& fil
              << person.family_type << ","
              << person.role_household_type << ","
              << person.total_income << ","
-             << person.personality.neuroticism << ","
-             << person.personality.conscientiousness << ","
-             << person.personality.extraversion << ","
-             << person.personality.agreeableness << ","
-             << person.personality.openness;
+             << person.personality.neuroticism.score << ","
+             << person.personality.conscientiousness.score << ","
+             << person.personality.extraversion.score << ","
+             << person.personality.agreeableness.score << ","
+             << person.personality.openness.score;
 
         // 回答データ
         auto response_it = person_responses.find(person.person_id);

@@ -36,7 +36,7 @@ std::string queryLLM(const std::string& prompt,const std::string& host, int port
     // 2. サーバーに送るリクエスト内容をJSONで作成
     json request_body;
     request_body["model"] = "openai/gpt-oss-120b";
-    //request_body["model"] = "openai/gpt-oss-20b"; // モデル名は任意です
+    //request_body["model"] = "openai/gpt-oss-20b"; //
     //request_body["model"] = "meta-llama/Llama-2-7b-chat-hf"; // モデル名は任意です
 
     //request_body["model"] = "hugging-quants/Meta-Llama-3.1-8B-Instruct-AWQ-INT4";
