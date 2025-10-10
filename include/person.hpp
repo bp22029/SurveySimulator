@@ -3,14 +3,65 @@
 
 #include <string>
 
+
+// 神経症傾向とそのファセット
+struct NeuroticismTrait {
+    float score;            // 全体のスコア
+    float anxiety;          // 不安
+    float depression;       // 抑うつ
+    float emotional_volatility; // 情緒不安定性
+};
+
+// 誠実性とそのファセット
+struct ConscientiousnessTrait {
+    float score;            // 全体のスコア
+    float organization;     // 秩序性
+    float productivity;     // 生産性
+    float responsibility;   // 責任感
+};
+
+// 外向性とそのファセット
+struct ExtraversionTrait {
+    float score;            // 全体のスコア
+    float sociability;      // 社交性
+    float assertiveness;    // 自己主張性
+    float energy_level;     // 活力
+};
+
+// 協調性とそのファセット
+struct AgreeablenessTrait {
+    float score;            // 全体のスコア
+    float compassion;       // 思いやり
+    float respectfulness;   // 敬意
+    float trust;            // 信用
+};
+
+// 開放性とそのファセット
+struct OpennessTrait {
+    float score;                    // 全体のスコア
+    float intellectual_curiosity; // 知的好奇心
+    float aesthetic_sensitivity;  // 美的感性
+    float creative_imagination;   // 創造的想像力
+};
+
 // Big Fiveの性格特性を格納する構造体
 struct BigFive {
-    float neuroticism;       // 神経症傾向
-    float conscientiousness; // 誠実性
-    float extraversion;      // 外向性
-    float agreeableness;     // 協調性
-    float openness;          // 開放性
+    NeuroticismTrait       neuroticism;
+    ConscientiousnessTrait conscientiousness;
+    ExtraversionTrait      extraversion;
+    AgreeablenessTrait     agreeableness;
+    OpennessTrait          openness;
 };
+
+
+// // Big Fiveの性格特性を格納する構造体
+// struct BigFive {
+//     float neuroticism;       // 神経症傾向
+//     float conscientiousness; // 誠実性
+//     float extraversion;      // 外向性
+//     float agreeableness;     // 協調性
+//     float openness;          // 開放性
+// };
 
 // 一人の人間を表す構造体
 struct Person {

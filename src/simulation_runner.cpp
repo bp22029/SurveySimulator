@@ -101,10 +101,10 @@ void runSurveySimulation(const std::vector<Person>& population,
     int current_count = 0;
     std::string generated_prompt;
     IndividualResponseManager responseManager;
-    const std::vector<std::pair<std::string, int>> servers = {
-        {"127.0.0.1", 8000},
-        {"127.0.0.1", 8001}
-    };
+    // const std::vector<std::pair<std::string, int>> servers = {
+    //     {"127.0.0.1", 8000},
+    //     {"127.0.0.1", 8001}
+    // };
 
     for (const auto& person : population) {
         for (int i = 0; i < questions.size(); ++i) {
@@ -117,7 +117,7 @@ void runSurveySimulation(const std::vector<Person>& population,
 
             //　LLM問い合わせ、質問回答
             //std::string queryLLM(const std::string& prompt,const std::string& host, int port)
-            int server_select = current_count % servers.size();
+            // int server_select = current_count % servers.size();
 
             std::string content;
             //content = queryLLM(generated_prompt,servers[server_select].first,servers[server_select].second);
