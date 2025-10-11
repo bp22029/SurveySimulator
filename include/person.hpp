@@ -4,7 +4,7 @@
 #include <string>
 
 
-// 神経症傾向とそのファセット
+// 否定的情動性とそのファセット
 struct NeuroticismTrait {
     float score;            // 全体のスコア
     float anxiety;          // 不安
@@ -12,7 +12,7 @@ struct NeuroticismTrait {
     float emotional_volatility; // 情緒不安定性
 };
 
-// 誠実性とそのファセット
+// 勤勉性とそのファセット
 struct ConscientiousnessTrait {
     float score;            // 全体のスコア
     float organization;     // 秩序性
@@ -56,8 +56,8 @@ struct BigFive {
 
 // // Big Fiveの性格特性を格納する構造体
 // struct BigFive {
-//     float neuroticism;       // 神経症傾向
-//     float conscientiousness; // 誠実性
+//     float neuroticism;       // 否定的情動性
+//     float conscientiousness; // 勤勉性
 //     float extraversion;      // 外向性
 //     float agreeableness;     // 協調性
 //     float openness;          // 開放性

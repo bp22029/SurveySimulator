@@ -27,7 +27,8 @@ void worker_function(
         //std::cout << "Generated Prompt: " << generated_prompt << std::endl;
 
         // 5．LLM問い合わせ、質問回答
-        std::string content = queryLLM(generated_prompt, host, port);
+        LLMParams params;
+        std::string content = queryLLM(generated_prompt, host, port,params);
         std::cout << "回答番号: " << content << std::endl;
 
         // 6. 回答の解析と結果のプッシュ
