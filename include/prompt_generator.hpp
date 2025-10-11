@@ -9,7 +9,7 @@
 #include <sstream>
 
 // プロンプトテンプレートを読み込む関数
-std::string readPromptTemplate();
+std::string readPromptTemplate(const std::string& template_path);
 
 // プロンプト生成関数
 std::string generatePrompt(const std::string& template_str, const Person& person, const Question& question);

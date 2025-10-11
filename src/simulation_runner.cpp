@@ -119,9 +119,10 @@ void runSurveySimulation(const std::vector<Person>& population,
             //std::string queryLLM(const std::string& prompt,const std::string& host, int port)
             // int server_select = current_count % servers.size();
 
+            LLMParams params;
             std::string content;
             //content = queryLLM(generated_prompt,servers[server_select].first,servers[server_select].second);
-            content = queryLLM(generated_prompt,"127.0.0.1",8000);//修正必須
+            content = queryLLM(generated_prompt,"127.0.0.1",8000,params);//修正必須
             std::cout << content << std::endl;
 
             // 個人回答の記録
@@ -206,4 +207,52 @@ void runSurveySimulation(const std::vector<Person>& population,
     //     responseManager.exportToCSV("../data/individual_responses.csv", question_ids);
     //     responseManager.printSummary();
     // }
+}
+
+void runTestSurveySimulation(const std::vector<Person>& population,
+                                const std::vector<Question>& questions,
+                                const std::string& prompt_template) {
+
+    int total_simulations = population.size() * questions.size();
+    int current_count = 0;
+    std::string generated_prompt;
+    IndividualResponseManager responseManager;
+
+    for (const auto& person : population) {
+        for (int i = 0; i < questions.size(); ++i) {
+            current_count++;
+            std::cout << "\n[" << current_count << "/" << total_simulations << "] "
+                      << "Agent ID: " << person.person_id << ", Question ID: " << questions[i].id << std::endl;
+
+            // プロンプト生成
+            generated_prompt = generatePrompt(prompt_template, person, questions[i]);
+
+            //　LLM問い合わせ、質問回答
+            //std::string queryLLM(const std::string& prompt,const std::string& host, int port)
+            // int server_select = current_count % servers.size();
+
+            LLMParams params;
+            std::string content;
+            //content = queryLLM(generated_prompt,servers[server_select].first,servers[server_select].second);
+            content = queryLLM(generated_prompt,"127.0.0.1",8000,params);//修正必須
+            std::cout << content << std::endl;
+
+            // 個人回答の記録
+            //int choice_number = extractChoiceNumber(content);
+            int choice_number = parseLlmAnswer(content);
+            if (choice_number != -1) {
+                responseManager.recordResponse(person.person_id, questions[i].id, choice_number);
+            }
+            //　回答の解析と集計
+            //parseAndRecordAnswer(content, questions[i], results[i]);
+        }
+        responseManager.printSummary();
+    }
+    std::vector<std::string> question_ids;
+    for (const auto& q : questions) {
+        question_ids.push_back(q.id);
+    }
+    responseManager.exportToCSV("../results/for_test_individual_responses.csv", question_ids);
+    responseManager.printSummary();
+
 }
