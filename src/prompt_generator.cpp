@@ -5,8 +5,9 @@
 #include <cstdio>
 #include <iostream>
 
-std::string readPromptTemplate() {
-    std::ifstream template_file("../data/prompt_template.txt");
+std::string readPromptTemplate(const std::string& template_path) {
+    // std::ifstream template_file("../data/prompt_template.txt");
+    std::ifstream template_file(template_path);
     std::string prompt_template;
     if (template_file.is_open()) {
         std::string line;
@@ -44,11 +45,11 @@ std::string generatePrompt(const std::string& template_str, const Person& person
 
     snprintf(buffer, sizeof(buffer), "%.2f", person.personality.neuroticism.score);
     //sprintf(buffer, "%.2f", person.personality.neuroticism);
-    replaceAll(prompt, "{神経症傾向}", buffer);
+    replaceAll(prompt, "{否定的情動性}", buffer);
 
     snprintf(buffer, sizeof(buffer), "%.2f", person.personality.conscientiousness.score);
     //sprintf(buffer, "%.2f", person.personality.conscientiousness);
-    replaceAll(prompt, "{誠実性}", buffer);
+    replaceAll(prompt, "{勤勉性}", buffer);
 
     snprintf(buffer, sizeof(buffer), "%.2f", person.personality.extraversion.score);
     //sprintf(buffer, "%.2f", person.personality.extraversion);
@@ -61,6 +62,46 @@ std::string generatePrompt(const std::string& template_str, const Person& person
     snprintf(buffer, sizeof(buffer), "%.2f", person.personality.openness.score);
     //sprintf(buffer, "%.2f", person.personality.openness);
     replaceAll(prompt, "{開放性}", buffer);
+
+    // BFI2 ファセット（否定的情動性）
+    snprintf(buffer, sizeof(buffer), "%.2f", person.personality.neuroticism.anxiety);
+    replaceAll(prompt, "{不安}", buffer);
+    snprintf(buffer, sizeof(buffer), "%.2f", person.personality.neuroticism.depression);
+    replaceAll(prompt, "{抑うつ}", buffer);
+    snprintf(buffer, sizeof(buffer), "%.2f", person.personality.neuroticism.emotional_volatility);
+    replaceAll(prompt, "{情緒不安定性}", buffer);
+
+    // BFI2 ファセット（勤勉性）
+    snprintf(buffer, sizeof(buffer), "%.2f", person.personality.conscientiousness.organization);
+    replaceAll(prompt, "{秩序性}", buffer);
+    snprintf(buffer, sizeof(buffer), "%.2f", person.personality.conscientiousness.productivity);
+    replaceAll(prompt, "{生産性}", buffer);
+    snprintf(buffer, sizeof(buffer), "%.2f", person.personality.conscientiousness.responsibility);
+    replaceAll(prompt, "{責任感}", buffer);
+
+    // BFI2 ファセット（外向性）
+    snprintf(buffer, sizeof(buffer), "%.2f", person.personality.extraversion.sociability);
+    replaceAll(prompt, "{社交性}", buffer);
+    snprintf(buffer, sizeof(buffer), "%.2f", person.personality.extraversion.assertiveness);
+    replaceAll(prompt, "{自己主張性}", buffer);
+    snprintf(buffer, sizeof(buffer), "%.2f", person.personality.extraversion.energy_level);
+    replaceAll(prompt, "{活力}", buffer);
+
+    // BFI2 ファセット（協調性）
+    snprintf(buffer, sizeof(buffer), "%.2f", person.personality.agreeableness.compassion);
+    replaceAll(prompt, "{思いやり}", buffer);
+    snprintf(buffer, sizeof(buffer), "%.2f", person.personality.agreeableness.respectfulness);
+    replaceAll(prompt, "{敬意}", buffer);
+    snprintf(buffer, sizeof(buffer), "%.2f", person.personality.agreeableness.trust);
+    replaceAll(prompt, "{信用}", buffer);
+
+    // BFI2 ファセット（開放性）
+    snprintf(buffer, sizeof(buffer), "%.2f", person.personality.openness.intellectual_curiosity);
+    replaceAll(prompt, "{知的好奇心}", buffer);
+    snprintf(buffer, sizeof(buffer), "%.2f", person.personality.openness.aesthetic_sensitivity);
+    replaceAll(prompt, "{美的感性}", buffer);
+    snprintf(buffer, sizeof(buffer), "%.2f", person.personality.openness.creative_imagination);
+    replaceAll(prompt, "{創造的想像力}", buffer);
 
     replaceAll(prompt, "{質問}", question.text);
 
