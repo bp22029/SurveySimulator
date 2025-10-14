@@ -37,10 +37,16 @@ int main() {
     if (questions.empty()) {
         return 1;
     }
-    // プロンプトテンプレートの読み込み
-    //std::string template_path = "../data/prompt_templates/prompt_template.txt";
-    std::string template_path = "../data/prompt_templates/prompt_template_BFI2.txt";
-    std::string prompt_template = readPromptTemplate(template_path);
+    // システムプロンプトのテンプレートの読み込み
+    std::string system_template_path = "../data/prompt_templates/prompt_template.txt";
+    //std::string system_template_path = "../data/prompt_templates/prompt_template_BFI2.txt";
+    //std::string system_template_path = "../data/prompt_templates/detailed_prompt_template.txt";
+
+    std::string system_prompt_template = readPromptTemplate(system_template_path);
+
+    // ユーザープロンプトのテンプレートの読み込み
+    std::string user_template_path = "../data/prompt_templates/user_prompt_template.txt";
+    std::string user_prompt_template = readPromptTemplate(user_template_path);
 
     //　回答集計の配列を初期化
     std::vector<SurveyResult> results;
@@ -50,11 +56,14 @@ int main() {
     //runSurveySimulation(population, questions, prompt_template, results);
     //runSurveySimulation_Parallel(population, questions, prompt_template, results, 64); // 64スレッドで実行
 
-    std::string generated_prompt = generatePrompt(prompt_template, test_population[0], questions[0]);
-    std::cout << generated_prompt << std::endl;
+    // プロンプト生成のテスト
+    std::string generated_system_prompt = generatePrompt(system_prompt_template, test_population[0], questions[0]);
+    std::string generated_user_prompt = generatePrompt(user_prompt_template, test_population[0], questions[0]);
+    std::cout << "Generated System Prompt:\n" << generated_system_prompt << std::endl;
+    std::cout << "Generated User Prompt:\n" << generated_user_prompt << std::endl;
 
     // テスト用シミュレーションの実行
-    runTestSurveySimulation(test_population, questions, prompt_template);
+    //runTestSurveySimulation(test_population, questions, system_prompt_template);
 
     // // 5．csvからクロス集計を行う
     // std::string merged_filename = "../data/merged_population_responses.csv";
