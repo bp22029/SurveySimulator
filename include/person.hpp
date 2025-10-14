@@ -53,6 +53,41 @@ struct BigFive {
     OpennessTrait          openness;
 };
 
+struct Schwartz {
+    float Self_Direction;
+    float Stimulation;
+    float Hedonism;
+    float Achievement;
+    float Power;
+    float Security;
+    float Conformity;
+    float Tradition;
+    float Benevolence;
+    float Universalism;
+};
+
+struct  Schwartz_PVQ {
+    float SelfDirection_Thought;
+    float SelfDirection_Action;
+    float Stimulation;
+    float Hedonism;
+    float Achievement;
+    float Power_Dominance;
+    float Power_Resources;
+    float Face;
+    float Security_Personal;
+    float Security_Societal;
+    float Tradition;
+    float Conformity_Rules;
+    float Conformity_Interpersonal;
+    float Humility;
+    float Universalism_Nature;
+    float Universalism_Concern;
+    float Universalism_Tolerance;
+    float Benevolence_Caring;
+    float Benevolence_Dependability;
+};
+
 
 // // Big Fiveの性格特性を格納する構造体
 // struct BigFive {
