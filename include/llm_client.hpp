@@ -15,20 +15,39 @@ using json = nlohmann::json;
 // LLMのパラメータを管理する構造体
 struct LLMParams {
     std::string model = "openai/gpt-oss-120b";
-    std::string system_prompt = "あなたは以下のプロフィールを持つ人物です。この人物になりきって、質問に回答してください。あなたの個人的な意見ではなく、この人物の性格や背景に基づいた考えで回答することが重要です。";
+    std::string system_prompt;
     double temperature = 0.0;
     int seed = 42;
     bool stream = false;
-    int max_tokens = 1024;
+    int max_tokens = 4096;
     double repetition_penalty = 1.1;
     // 必要に応じて他のパラメータを追加
     double top_p = 0.05;
     // std::vector<std::string> stop = {"\n", "。"};
+};
+struct LLMParamsForPersonality : public LLMParams {
+    LLMParamsForPersonality() {
+        // 人格推定・BFI2向けの推奨既定値（必要に応じて調整）
+        system_prompt =
+            "あなたは性格の専門家です。性格の特性を表す数値から性格を推定し、人物像を記述してください。"
+            "ビッグファイブの各特性について、1行ずつ説明してください。"
+            "総合的な人物像を３行程度で最後に記述してください。";
+        temperature = 0.2;
+        top_p = 0.05;
+        max_tokens = 4096;
+        repetition_penalty = 1.1;
+        seed = 42;
+        stream = false;
+        // 必要ならモデルも専用に変更
+        // model = "openai/gpt-oss-20b";
+    }
 };
 
 //LLMに問い合わせを行う
 // std::string queryLLM(const std::string& prompt,const std::string& host, int port);
 
 std::string queryLLM(const std::string& prompt, const std::string& host, int port, const LLMParams& params);
+
+std::string queryLLMForPersonality(const std::string& prompt, const std::string& host, int port, const LLMParams& params);
 
 #endif

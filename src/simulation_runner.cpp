@@ -93,13 +93,15 @@ void runSurveySimulation_Parallel(const std::vector<Person>& population,
 
 void runSurveySimulation(const std::vector<Person>& population,
                         const std::vector<Question>& questions,
-                        const std::string& prompt_template,
+                        const std::string& system_prompt_template,
+                        const std::string& user_prompt_template,
                         std::vector<SurveyResult>& results) {
 
     int total_simulations = population.size() * questions.size(); //本来はこちら
     //int total_simulations = 1 * questions.size(); //デバッグ用に最初の1人だけに制限
     int current_count = 0;
-    std::string generated_prompt;
+    std::string generated_system_prompt;
+    std::string generated_user_prompt;
     IndividualResponseManager responseManager;
     // const std::vector<std::pair<std::string, int>> servers = {
     //     {"127.0.0.1", 8000},
@@ -113,16 +115,19 @@ void runSurveySimulation(const std::vector<Person>& population,
                       << "Agent ID: " << person.person_id << ", Question ID: " << questions[i].id << std::endl;
 
             // プロンプト生成
-            generated_prompt = generatePrompt(prompt_template, person, questions[i]);
+            generated_system_prompt = generatePrompt(system_prompt_template, person, questions[i]);
+            generated_user_prompt = generatePrompt(user_prompt_template, person, questions[i]);
+
 
             //　LLM問い合わせ、質問回答
             //std::string queryLLM(const std::string& prompt,const std::string& host, int port)
             // int server_select = current_count % servers.size();
 
             LLMParams params;
+            params.system_prompt = system_prompt_template;
             std::string content;
             //content = queryLLM(generated_prompt,servers[server_select].first,servers[server_select].second);
-            content = queryLLM(generated_prompt,"127.0.0.1",8000,params);//修正必須
+            content = queryLLM(generated_user_prompt,"127.0.0.1",8000,params);//修正必須
             std::cout << content << std::endl;
 
             // 個人回答の記録
@@ -219,6 +224,18 @@ void runTestSurveySimulation(const std::vector<Person>& population,
     IndividualResponseManager responseManager;
 
     for (const auto& person : population) {
+        LLMParamsForPersonality paramsForPersonality;
+        const std::string test_prompt = "# 個性"
+                                        "あなたの性格をビッグファイブの5つの特性で表すと、以下のようになります。"
+                                        "性格特性 (0が最も低く、1が最も高い):"
+                                          "- 否定的情動性: 0.65"
+                                          "- 勤勉性: 0.62"
+                                          "- 外向性: 0.62"
+                                          "- 協調性: 0.62"
+                                          "- 開放性: 0.58)";
+        std::string personality_info = queryLLM(test_prompt,"127.0.0.1",8000,paramsForPersonality);
+        std::cout << "Personality Info: " << personality_info << std::endl;
+
         for (int i = 0; i < questions.size(); ++i) {
             current_count++;
             std::cout << "\n[" << current_count << "/" << total_simulations << "] "

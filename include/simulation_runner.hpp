@@ -14,7 +14,8 @@
 // シミュレーション実行関数
 void runSurveySimulation(const std::vector<Person>& population,
                         const std::vector<Question>& questions,
-                        const std::string& prompt_template,
+                        const std::string& system_prompt_template,
+                        const std::string& user_prompt_template,
                         std::vector<SurveyResult>& results);
 
 void runSurveySimulation_Parallel(const std::vector<Person>& population,

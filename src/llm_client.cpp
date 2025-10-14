@@ -37,13 +37,13 @@ std::string queryLLM(const std::string& prompt, const std::string& host, int por
     json request_body;
     request_body["model"] = params.model;
 
-    // ベースモデル向けに、システムプロンプトとユーザープロンプトを統合
-    std::string combined_prompt = params.system_prompt + "\n" + prompt;
+
 
     // messages形式で送信
     request_body["messages"] = json::array({
-        {{"role", "user"}, {"content", combined_prompt}}
-    });
+     {{"role", "system"}, {"content", params.system_prompt}},
+     {{"role", "user"}, {"content", prompt}}
+     });
 
     // 各種パラメータを設定
     request_body["temperature"] = params.temperature;
@@ -68,6 +68,7 @@ std::string queryLLM(const std::string& prompt, const std::string& host, int por
         try {
             json response_json = json::parse(res->body);
 
+            //std::cout << response_json << std::endl;
             // "content" が存在し、かつ null でないことを確認
             if (response_json.contains("choices") && !response_json["choices"].empty() &&
                 response_json["choices"][0].contains("message") &&
@@ -99,6 +100,7 @@ std::string queryLLM(const std::string& prompt, const std::string& host, int por
         return "ERROR";
     }
 }
+
 
 
 
