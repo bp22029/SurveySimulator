@@ -81,11 +81,11 @@ struct  Schwartz_PVQ {
     float Conformity_Rules;
     float Conformity_Interpersonal;
     float Humility;
+    float Benevolence_Caring;
+    float Benevolence_Dependability;
     float Universalism_Nature;
     float Universalism_Concern;
     float Universalism_Tolerance;
-    float Benevolence_Caring;
-    float Benevolence_Dependability;
 };
 
 
@@ -112,6 +112,8 @@ struct Person {
     std::string company_size;
     int total_income;
     BigFive personality;
+    Schwartz schwartz;
+    Schwartz_PVQ schwartz_pvq;
 };
 
 #endif // PERSON_HPP

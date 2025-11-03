@@ -103,6 +103,68 @@ std::string generatePrompt(const std::string& template_str, const Person& person
     snprintf(buffer, sizeof(buffer), "%.2f", person.personality.openness.creative_imagination);
     replaceAll(prompt, "{創造的想像力}", buffer);
 
+    // Scwartzの価値観
+    snprintf(buffer, sizeof(buffer), "%.2f", person.schwartz.Self_Direction);
+    replaceAll(prompt, "{自己志向}", buffer);
+    snprintf(buffer, sizeof(buffer), "%.2f", person.schwartz.Stimulation);
+    replaceAll(prompt, "{刺激}", buffer);
+    snprintf(buffer, sizeof(buffer), "%.2f", person.schwartz.Hedonism);
+    replaceAll(prompt, "{快楽}", buffer);
+    snprintf(buffer, sizeof(buffer), "%.2f", person.schwartz.Achievement);
+    replaceAll(prompt, "{達成}", buffer);
+    snprintf(buffer, sizeof(buffer), "%.2f", person.schwartz.Power);
+    replaceAll(prompt, "{権力}", buffer);
+    snprintf(buffer, sizeof(buffer), "%.2f", person.schwartz.Security);
+    replaceAll(prompt, "{安全}", buffer);
+    snprintf(buffer, sizeof(buffer), "%.2f", person.schwartz.Conformity);
+    replaceAll(prompt, "{同調}", buffer);
+    snprintf(buffer, sizeof(buffer), "%.2f", person.schwartz.Tradition);
+    replaceAll(prompt, "{伝統}", buffer);
+    snprintf(buffer, sizeof(buffer), "%.2f", person.schwartz.Benevolence);
+    replaceAll(prompt, "{博愛}", buffer);
+    snprintf(buffer, sizeof(buffer), "%.2f", person.schwartz.Universalism);
+    replaceAll(prompt, "{普遍主義}", buffer);
+
+    // Scwartzの価値観（PVQ）
+    snprintf(buffer, sizeof(buffer), "%.2f", person.schwartz_pvq.SelfDirection_Thought);
+    replaceAll(prompt, "{自己志向_思考_PVQ}", buffer);
+    snprintf(buffer, sizeof(buffer), "%.2f", person.schwartz_pvq.SelfDirection_Action);
+    replaceAll(prompt, "{自己志向_行動_PVQ}", buffer);
+    snprintf(buffer, sizeof(buffer), "%.2f", person.schwartz_pvq.Stimulation);
+    replaceAll(prompt, "{刺激_PVQ}", buffer);
+    snprintf(buffer, sizeof(buffer), "%.2f", person.schwartz_pvq.Hedonism);
+    replaceAll(prompt, "{快楽_PVQ}", buffer);
+    snprintf(buffer, sizeof(buffer), "%.2f", person.schwartz_pvq.Achievement);
+    replaceAll(prompt, "{達成_PVQ}", buffer);
+    snprintf(buffer, sizeof(buffer), "%.2f", person.schwartz_pvq.Power_Dominance);
+    replaceAll(prompt, "{権力_支配_PVQ}", buffer);
+    snprintf(buffer, sizeof(buffer), "%.2f", person.schwartz_pvq.Power_Resources);
+    replaceAll(prompt, "{権力_資源_PVQ}", buffer);
+    snprintf(buffer, sizeof(buffer), "%.2f", person.schwartz_pvq.Face);
+    replaceAll(prompt, "{体面_PVQ}", buffer);
+    snprintf(buffer, sizeof(buffer), "%.2f", person.schwartz_pvq.Security_Personal);
+    replaceAll(prompt, "{安全_個人_PVQ}", buffer);
+    snprintf(buffer, sizeof(buffer), "%.2f", person.schwartz_pvq.Security_Societal);
+    replaceAll(prompt, "{安全_社会_PVQ}", buffer);
+    snprintf(buffer, sizeof(buffer), "%.2f", person.schwartz_pvq.Tradition);
+    replaceAll(prompt, "{伝統_PVQ}", buffer);
+    snprintf(buffer, sizeof(buffer), "%.2f", person.schwartz_pvq.Conformity_Rules);
+    replaceAll(prompt, "{同調_規則_PVQ}", buffer);
+    snprintf(buffer, sizeof(buffer), "%.2f", person.schwartz_pvq.Conformity_Interpersonal);
+    replaceAll(prompt, "{同調_対人_PVQ}", buffer);
+    snprintf(buffer, sizeof(buffer), "%.2f", person.schwartz_pvq.Humility);
+    replaceAll(prompt, "{謙虚_PVQ}", buffer);
+    snprintf(buffer, sizeof(buffer), "%.2f", person.schwartz_pvq.Benevolence_Caring);
+    replaceAll(prompt, "{博愛_配慮_PVQ}", buffer);
+    snprintf(buffer, sizeof(buffer), "%.2f", person.schwartz_pvq.Benevolence_Dependability);
+    replaceAll(prompt, "{博愛_信頼_PVQ}", buffer);
+    snprintf(buffer, sizeof(buffer), "%.2f", person.schwartz_pvq.Universalism_Nature);
+    replaceAll(prompt, "{普遍主義_自然_PVQ}", buffer);
+    snprintf(buffer, sizeof(buffer), "%.2f", person.schwartz_pvq.Universalism_Concern);
+    replaceAll(prompt, "{普遍主義_関心_PVQ}", buffer);
+    snprintf(buffer, sizeof(buffer), "%.2f", person.schwartz_pvq.Universalism_Tolerance);
+    replaceAll(prompt, "{普遍主義_寛容_PVQ}", buffer);
+
     replaceAll(prompt, "{質問}", question.text);
 
     std::string choices_str;
