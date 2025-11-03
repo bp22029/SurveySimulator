@@ -177,6 +177,36 @@ std::vector<Person> readPopulationForTest(const std::string& filename) {
         person.personality.openness.intellectual_curiosity = std::stof(fields[28]);
         person.personality.openness.aesthetic_sensitivity = std::stof(fields[29]);
         person.personality.openness.creative_imagination = std::stof(fields[30]);
+        person.schwartz.Self_Direction = std::stof(fields[31]);
+        person.schwartz.Stimulation = std::stof(fields[32]);
+        person.schwartz.Hedonism = std::stof(fields[33]);
+        person.schwartz.Achievement = std::stof(fields[34]);
+        person.schwartz.Power = std::stof(fields[35]);
+        person.schwartz.Security = std::stof(fields[36]);
+        person.schwartz.Conformity = std::stof(fields[37]);
+        person.schwartz.Tradition = std::stof(fields[38]);
+        person.schwartz.Benevolence = std::stof(fields[39]);
+        person.schwartz.Universalism = std::stof(fields[40]);
+        person.schwartz_pvq.SelfDirection_Thought = std::stof(fields[41]);
+        person.schwartz_pvq.SelfDirection_Action = std::stof(fields[42]);
+        person.schwartz_pvq.Stimulation = std::stof(fields[43]);
+        person.schwartz_pvq.Hedonism = std::stof(fields[44]);
+        person.schwartz_pvq.Achievement = std::stof(fields[45]);
+        person.schwartz_pvq.Power_Dominance = std::stof(fields[46]);
+        person.schwartz_pvq.Power_Resources = std::stof(fields[47]);
+        person.schwartz_pvq.Face = std::stof(fields[48]);
+        person.schwartz_pvq.Security_Personal = std::stof(fields[49]);
+        person.schwartz_pvq.Security_Societal = std::stof(fields[50]);
+        person.schwartz_pvq.Tradition = std::stof(fields[51]);
+        person.schwartz_pvq.Conformity_Rules = std::stof(fields[52]);
+        person.schwartz_pvq.Conformity_Interpersonal = std::stof(fields[53]);
+        person.schwartz_pvq.Humility = std::stof(fields[54]);
+        person.schwartz_pvq.Benevolence_Caring = std::stof(fields[55]);
+        person.schwartz_pvq.Benevolence_Dependability = std::stof(fields[56]);
+        person.schwartz_pvq.Universalism_Nature = std::stof(fields[57]);
+        person.schwartz_pvq.Universalism_Concern = std::stof(fields[58]);
+        person.schwartz_pvq.Universalism_Tolerance = std::stof(fields[59]);
+
 
         population.push_back(person);
     }

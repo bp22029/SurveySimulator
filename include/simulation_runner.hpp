@@ -26,6 +26,7 @@ void runSurveySimulation_Parallel(const std::vector<Person>& population,
 
 void runTestSurveySimulation(const std::vector<Person>& population,
                                 const std::vector<Question>& questions,
-                                const std::string& prompt_template);
+                                const std::string& system_prompt_template,
+                                const std::string& user_prompt_template);
 
 #endif // SIMULATION_RUNNER_HPP
