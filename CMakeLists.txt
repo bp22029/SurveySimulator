@@ -25,26 +25,37 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(json)
 
-add_executable(SurveySimulator src/main.cpp
-        src/data_loader.cpp
-        src/prompt_generator.cpp
-        src/llm_client.cpp
-        src/survey_results.cpp
-        src/simulation_runner.cpp
-        src/response_parser.cpp
-        src/individual_response_manager.cpp
-        include/ThreadSafeQueue.hpp
-        src/thread_worker.cpp
-        src/cross_table_generator.cpp
-        include/cross_table_generator.hpp
+FetchContent_Declare(
+        googletest
+        GIT_REPOSITORY https://github.com/google/googletest.git
+        GIT_TAG release-1.12.1 # (適宜バージョン確認)
 )
 
-target_include_directories(SurveySimulator PRIVATE
-        ${httplib_SOURCE_DIR}
-        ${json_SOURCE_DIR}/include
-)
+set(BUILD_SHARED_LIBS OFF)
 
-target_include_directories(SurveySimulator PUBLIC include)
+FetchContent_MakeAvailable(googletest)
 
-set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /Zi")
+# CTest (CMakeのテスト機能) を有効化
+enable_testing()
+
+# カバレッジ設定 (Debugビルド時のみ有効)
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    message(STATUS "Coverage flags enabled for Debug build")
+
+    # ▼▼▼ 以下のように修正 ▼▼▼
+    if(MSVC)
+        # MSVC (Visual Studio) の場合は /PROFILE を使用
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /PROFILE")
+        set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /PROFILE")
+    else()
+        # GCC/Clang の場合は --coverage を使用
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --coverage")
+        set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} --coverage")
+    endif()
+endif()
+
+# サブディレクトリを追加
+add_subdirectory(src)
+add_subdirectory(tests)
+
 

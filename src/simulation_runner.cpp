@@ -82,9 +82,9 @@ void runSurveySimulation_Parallel(const std::vector<Person>& population,
     for (const auto& q : questions) {
         question_ids.push_back(q.id);
     }
-    responseManager.exportToCSV("../results/individual_responses.csv", question_ids);
+    responseManager.exportToCSV("../../results/individual_responses.csv", question_ids);
     responseManager.printSummary();
-    responseManager.exportMergedPopulationCSV("../data/merged_population_responses.csv", population, question_ids);
+    responseManager.exportMergedPopulationCSV("../../data/merged_population_responses.csv", population, question_ids);
 
     std::cout << "Simulation finished." << std::endl;
 }
@@ -175,10 +175,10 @@ void runSurveySimulation(const std::vector<Person>& population,
         question_ids.push_back(q.id);
     }
     // CSVエクスポート
-    responseManager.exportToCSV("../results/individual_responses.csv", question_ids);
+    responseManager.exportToCSV("../../results/individual_responses.csv", question_ids);
     responseManager.printSummary();
 
-    responseManager.exportMergedPopulationCSV("../data/merged_population_responses.csv", population, question_ids );
+    responseManager.exportMergedPopulationCSV("../../data/merged_population_responses.csv", population, question_ids );
 }
 
 void runTestSurveySimulation(const std::vector<Person>& population,
@@ -244,7 +244,7 @@ void runTestSurveySimulation(const std::vector<Person>& population,
     for (const auto& q : questions) {
         question_ids.push_back(q.id);
     }
-    responseManager.exportToCSV("../results/for_test_individual_responses.csv", question_ids);
+    responseManager.exportToCSV("../../results/for_test_individual_responses.csv", question_ids);
     responseManager.printSummary();
 
 }
