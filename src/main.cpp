@@ -23,40 +23,40 @@ using json = nlohmann::json;
 
 int main() {
     // 合成人口データの読み込み
-    std::vector<Person> population = readSyntheticPopulation("../data/2015_001_8+_47356.csv");
+    std::vector<Person> population = readSyntheticPopulation("../../data/2015_001_8+_47356.csv");
     if (population.empty()) {
         return 1;
     }
 
     // テスト用人口データの読み込み
-    std::vector<Person> test_population = readPopulationForTest("../data/verification_population.csv");
+    std::vector<Person> test_population = readPopulationForTest("../../data/verification_population.csv");
     if (test_population.empty()) {
         return 1;
     }
 
     // 質問データの読み込み
-    std::vector<Question> questions = readQuestions("../data/ssm2015.csv");
+    std::vector<Question> questions = readQuestions("../../data/ssm2015.csv");
     if (questions.empty()) {
         return 1;
     }
     // システムプロンプトのテンプレートの読み込み
     //ビッグファイブ性格特性推定用
-    //std::string system_template_path = "../data/prompt_templates/prompt_template.txt";
+    //std::string system_template_path = "../../data/prompt_templates/prompt_template.txt";
     //BFI2
-    //std::string system_template_path = "../data/prompt_templates/prompt_template_BFI2.txt";
+    //std::string system_template_path = "../../data/prompt_templates/prompt_template_BFI2.txt";
     //シュワルツの10価値観
-    //std::string system_template_path = "../data/prompt_templates/prompt_template_schwartz.txt";
+    //std::string system_template_path = "../../data/prompt_templates/prompt_template_schwartz.txt";
     //シュワルツの価値観(PVQ)
-    //std::string system_template_path = "../data/prompt_templates/prompt_template_PVQ_schwartz.txt";
+    //std::string system_template_path = "../../data/prompt_templates/prompt_template_PVQ_schwartz.txt";
     //複合型
-    std::string system_template_path = "../data/prompt_templates/prompt_template_complex.txt";
+    std::string system_template_path = "../../data/prompt_templates/prompt_template_complex.txt";
 
 
 
     std::string system_prompt_template = readPromptTemplate(system_template_path);
 
     // ユーザープロンプトのテンプレートの読み込み
-    std::string user_template_path = "../data/prompt_templates/user_prompt_template.txt";
+    std::string user_template_path = "../../data/prompt_templates/user_prompt_template.txt";
     std::string user_prompt_template = readPromptTemplate(user_template_path);
 
     //　回答集計の配列を初期化
@@ -77,7 +77,7 @@ int main() {
 
 
     // テスト用シミュレーションの実行
-    runTestSurveySimulation(test_population, questions, system_prompt_template, user_prompt_template);
+    //runTestSurveySimulation(test_population, questions, system_prompt_template, user_prompt_template);
 
     // // 5．csvからクロス集計を行う
     // std::string merged_filename = "../data/merged_population_responses.csv";
