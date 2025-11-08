@@ -1,0 +1,35 @@
+name: C++ CI Build & Test
+
+# 1. どのタイミングで実行するか (mainブランチへの push / pull_request された時)
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+# 2. 実行する「ジョブ」
+jobs:
+  build-and-test:
+    # 3. 実行環境 (Ubuntuの最新版)
+    runs-on: ubuntu-latest
+
+    # 4. 実行する「ステップ」
+    steps:
+      # 4-1. リポジトリのコードをチェックアウト(持ってくる)
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      # 4-2. CMakeでビルド設定 (Debugモード)
+      # ※ Ubuntu (GCC) なので --coverage が有効になります
+      - name: Configure CMake
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Debug
+
+      # 4-3. ビルド (コンパイル)
+      # ※ これで SurveySimulator と run_tests の両方がビルドされます
+      - name: Build
+        run: cmake --build build
+
+      # 4-4. テストの実行 (ctest経由)
+      - name: Run Tests
+        working-directory: ./build # buildディレクトリに移動してから実行
+        run: ctest -V # CTestを詳細モードで実行
