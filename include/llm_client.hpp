@@ -8,6 +8,7 @@
 #include "httplib.h"
 #include "httplib.h"
 #include "nlohmann/json.hpp"
+#include <functional> // ★ std::function のために追加
 
 // nlohmann/jsonライブラリの名前空間を省略
 using json = nlohmann::json;
@@ -42,6 +43,14 @@ struct LLMParamsForPersonality : public LLMParams {
         // model = "openai/gpt-oss-20b";
     }
 };
+
+// ★ queryLLM と同じ「型」を持つ関数ポインタ（std::function）を定義
+using LlmQueryFunc = std::function<std::string(
+    const std::string&,
+    const std::string&,
+    int,
+    const LLMParams&
+)>;
 
 //LLMに問い合わせを行う
 // std::string queryLLM(const std::string& prompt,const std::string& host, int port);
