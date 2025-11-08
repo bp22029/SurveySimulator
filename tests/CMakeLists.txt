@@ -2,6 +2,7 @@
 add_executable(run_tests
         prompt_generator_test.cpp
         response_parser_test.cpp
+        individual_response_manager_test.cpp
 )
 
 # (2) run_tests が必要とするライブラリをリンク
