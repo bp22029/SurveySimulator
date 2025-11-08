@@ -9,6 +9,7 @@
 #include <fstream>
 #include "individual_response_manager.hpp"
 #include "person.hpp"
+#include "llm_client.hpp"
 
 
 // シミュレーション実行関数
@@ -16,7 +17,9 @@ void runSurveySimulation(const std::vector<Person>& population,
                         const std::vector<Question>& questions,
                         const std::string& system_prompt_template,
                         const std::string& user_prompt_template,
-                        std::vector<SurveyResult>& results);
+                        std::vector<SurveyResult>& results,
+                        IndividualResponseManager& responseManager,
+                        LlmQueryFunc query_func);
 
 void runSurveySimulation_Parallel(const std::vector<Person>& population,
                                  const std::vector<Question>& questions,
@@ -28,5 +31,11 @@ void runTestSurveySimulation(const std::vector<Person>& population,
                                 const std::vector<Question>& questions,
                                 const std::string& system_prompt_template,
                                 const std::string& user_prompt_template);
+
+void exportResultsToFiles(const IndividualResponseManager& responseManager,
+                               const std::vector<Person>& population,
+                               const std::vector<Question>& questions,
+                               const std::string& individual_responses_path,
+                               const std::string& merged_responses_path);
 
 #endif // SIMULATION_RUNNER_HPP

@@ -70,14 +70,20 @@ int main() {
     std::cout << "Generated User Prompt:\n" << generated_user_prompt << std::endl;
 
 
+    IndividualResponseManager responseManager;
 
     // 4. シミュレーションの実行
-    //runSurveySimulation(population, questions, system_prompt_template,user_prompt_template, results);
+    runSurveySimulation(population, questions, system_prompt_template,user_prompt_template, results, responseManager, &queryLLM);
     //runSurveySimulation_Parallel(population, questions, prompt_template, results, 64); // 64スレッドで実行
 
 
     // テスト用シミュレーションの実行
     runTestSurveySimulation(test_population, questions, system_prompt_template, user_prompt_template);
+
+
+    exportResultsToFiles(responseManager,population,questions,
+                         "../../results/individual_responses.csv",
+                         "../../data/merged_population_responses.csv");
 
     // // 5．csvからクロス集計を行う
     // std::string merged_filename = "../data/merged_population_responses.csv";

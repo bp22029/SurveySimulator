@@ -95,14 +95,16 @@ void runSurveySimulation(const std::vector<Person>& population,
                         const std::vector<Question>& questions,
                         const std::string& system_prompt_template,
                         const std::string& user_prompt_template,
-                        std::vector<SurveyResult>& results) {
+                        std::vector<SurveyResult>& results,
+                        IndividualResponseManager& responseManager,
+                        LlmQueryFunc query_func) {
 
     int total_simulations = population.size() * questions.size(); //本来はこちら
     //int total_simulations = 1 * questions.size(); //デバッグ用に最初の1人だけに制限
     int current_count = 0;
     std::string generated_system_prompt;
     std::string generated_user_prompt;
-    IndividualResponseManager responseManager;
+    //IndividualResponseManager responseManager;
     // const std::vector<std::pair<std::string, int>> servers = {
     //     {"127.0.0.1", 8000},
     //     {"127.0.0.1", 8001}
@@ -127,7 +129,8 @@ void runSurveySimulation(const std::vector<Person>& population,
             params.system_prompt = generated_system_prompt;
             std::string content;
             //content = queryLLM(generated_prompt,servers[server_select].first,servers[server_select].second);
-            content = queryLLM(generated_user_prompt,"127.0.0.1",8000,params);//修正必須
+            //content = queryLLM(generated_user_prompt,"127.0.0.1",8000,params);//修正必須
+            content = query_func(generated_user_prompt,"127.0.0.1",8000,params);//修正必須
             std::cout << content << std::endl;
 
             // 個人回答の記録
@@ -142,43 +145,33 @@ void runSurveySimulation(const std::vector<Person>& population,
         responseManager.printSummary();
     }
 
-    // //デバッグ用に最初の1人だけに制限
-    // auto person = population[0];
-    // for (int i = 0; i < questions.size(); ++i) {
-    //     current_count++;
-    //     std::cout << "\n[" << current_count << "/" << total_simulations << "] "
-    //               << "Agent ID: " << person.person_id << ", Question ID: " << questions[i].id << std::endl;
-    //
-    //     // プロンプト生成
-    //     generated_prompt = generatePrompt(prompt_template, person, questions[i]);
-    //
-    //     //　LLM問い合わせ、質問回答
-    //     std::string content = queryLLM(generated_prompt);
-    //     std::cout << content << std::endl;
-    //
-    //     // 個人回答の記録
-    //     //int choice_number = extractChoiceNumber(content);]
-    //     int choice_number = std::stoi(content);
-    //     if (choice_number != -1) {
-    //         responseManager.recordResponse(person.person_id, questions[i].id, choice_number);
-    //     }
-    //
-    //     //　回答の解析と集計
-    //     //parseAndRecordAnswer(content, questions[i], results[i]);
-    //
-    //
-    // }
 
-    // 質問IDリストを作成
+//     // 質問IDリストを作成
+//     std::vector<std::string> question_ids;
+//     for (const auto& q : questions) {
+//         question_ids.push_back(q.id);
+//     }
+//     // CSVエクスポート
+//     responseManager.exportToCSV("../../results/individual_responses.csv", question_ids);
+//     responseManager.printSummary();
+//
+//     responseManager.exportMergedPopulationCSV("../../data/merged_population_responses.csv", population, question_ids );
+}
+
+// ★ 引数を、出力したいファイルパス2つに変更
+void exportResultsToFiles(const IndividualResponseManager& responseManager,
+                               const std::vector<Person>& population,
+                               const std::vector<Question>& questions,
+                               const std::string& individual_responses_path,
+                               const std::string& merged_responses_path) {
     std::vector<std::string> question_ids;
     for (const auto& q : questions) {
         question_ids.push_back(q.id);
     }
-    // CSVエクスポート
-    responseManager.exportToCSV("../../results/individual_responses.csv", question_ids);
-    responseManager.printSummary();
 
-    responseManager.exportMergedPopulationCSV("../../data/merged_population_responses.csv", population, question_ids );
+    // ★ 引数で渡されたパスを使う
+    responseManager.exportToCSV(individual_responses_path, question_ids);
+    responseManager.exportMergedPopulationCSV(merged_responses_path, population, question_ids);
 }
 
 void runTestSurveySimulation(const std::vector<Person>& population,
