@@ -39,9 +39,10 @@ int main() {
     if (questions.empty()) {
         return 1;
     }
+
     // システムプロンプトのテンプレートの読み込み
     //ビッグファイブ性格特性推定用
-    //std::string system_template_path = "../../data/prompt_templates/prompt_template.txt";
+    std::string system_template_path = "../../data/prompt_templates/prompt_template.txt";
     //BFI2
     //std::string system_template_path = "../../data/prompt_templates/prompt_template_BFI2.txt";
     //シュワルツの10価値観
@@ -49,7 +50,7 @@ int main() {
     //シュワルツの価値観(PVQ)
     //std::string system_template_path = "../../data/prompt_templates/prompt_template_PVQ_schwartz.txt";
     //複合型
-    std::string system_template_path = "../../data/prompt_templates/prompt_template_complex.txt";
+    //std::string system_template_path = "../../data/prompt_templates/prompt_template_complex.txt";
 
 
 
@@ -63,7 +64,7 @@ int main() {
     std::vector<SurveyResult> results;
     initializeSurveyResults(results,questions);
 
-    // プロンプト生成のテスト
+    //プロンプト生成のテスト
     std::string generated_system_prompt = generatePrompt(system_prompt_template, test_population[0], questions[0]);
     std::string generated_user_prompt = generatePrompt(user_prompt_template, test_population[0], questions[0]);
     std::cout << "Generated System Prompt:\n" << generated_system_prompt << std::endl;
@@ -73,7 +74,7 @@ int main() {
     IndividualResponseManager responseManager;
 
     // 4. シミュレーションの実行
-    runSurveySimulation(population, questions, system_prompt_template,user_prompt_template, results, responseManager, &queryLLM);
+    //runSurveySimulation(population, questions, system_prompt_template,user_prompt_template, results, responseManager, &queryLLM);
     //runSurveySimulation_Parallel(population, questions, prompt_template, results, 64); // 64スレッドで実行
 
 
@@ -81,9 +82,9 @@ int main() {
     runTestSurveySimulation(test_population, questions, system_prompt_template, user_prompt_template);
 
 
-    exportResultsToFiles(responseManager,population,questions,
-                         "../../results/individual_responses.csv",
-                         "../../data/merged_population_responses.csv");
+    // exportResultsToFiles(responseManager,population,questions,
+    //                      "../../results/individual_responses.csv",
+    //                      "../../data/merged_population_responses.csv");
 
     // // 5．csvからクロス集計を行う
     // std::string merged_filename = "../data/merged_population_responses.csv";

@@ -156,7 +156,7 @@ std::vector<Person> readPopulationForTest(const std::string& filename) {
         person.role_household_type = fields[7];
         person.employment_type = fields[8];
         person.company_size = fields[9];
-        person.total_income = std::stoi(fields[10]);
+        person.total_income = fields[10].empty() ? 0 : std::stoi(fields[10]);
         person.personality.extraversion.score = std::stof(fields[11]);
         person.personality.agreeableness.score = std::stof(fields[12]);
         person.personality.conscientiousness.score = std::stof(fields[13]);
