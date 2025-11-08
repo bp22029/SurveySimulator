@@ -77,7 +77,7 @@ int main() {
 
 
     // テスト用シミュレーションの実行
-    //runTestSurveySimulation(test_population, questions, system_prompt_template, user_prompt_template);
+    runTestSurveySimulation(test_population, questions, system_prompt_template, user_prompt_template);
 
     // // 5．csvからクロス集計を行う
     // std::string merged_filename = "../data/merged_population_responses.csv";
