@@ -23,82 +23,70 @@ using json = nlohmann::json;
  * @param params LLMの各種パラメータ
  * @return std::string LLMからの応答テキスト。エラーの場合は"ERROR"を返す。
  */
-std::string queryLLM(const std::string& prompt, const std::string& host, int port, const LLMParams& params) {
+// 戻り値を格納する構造体を定義
 
-    // 1. 接続先のサーバーを指定
+// queryLLMの戻り値を std::string から LLMResponse に変更
+LLMResponse queryLLM(const std::string& prompt, const std::string& host, int port, const LLMParams& params) {
+    LLMResponse result; // 結果格納用
+
     httplib::Client cli(host, port);
-
-    // タイムアウトを10分 (600秒) に設定
     cli.set_connection_timeout(60);
     cli.set_read_timeout(600);
     cli.set_write_timeout(60);
 
-    // 2. サーバーに送るリクエスト内容をJSONで作成
     json request_body;
     request_body["model"] = params.model;
-
-
-
-    // messages形式で送信
     request_body["messages"] = json::array({
-     {{"role", "system"}, {"content", params.system_prompt}},
-     {{"role", "user"}, {"content", prompt}}
-     });
+        {{"role", "system"}, {"content", params.system_prompt}},
+        {{"role", "user"}, {"content", prompt}}
+    });
 
-    // 各種パラメータを設定
     request_body["temperature"] = params.temperature;
     request_body["seed"] = params.seed;
     request_body["stream"] = params.stream;
     request_body["max_tokens"] = params.max_tokens;
     request_body["repetition_penalty"] = params.repetition_penalty;
+    if (params.top_p > 0.0) request_body["top_p"] = params.top_p;
 
-    // その他のパラメータ（必要であればコメントを外して使用）
-    if (params.top_p > 0) {
-        request_body["top_p"] = params.top_p;
-    }
-    // if (!params.stop.empty()) {
-    //     request_body["stop"] = params.stop;
-    // }
-
-    // 3. "/v1/chat/completions"エンドポイントにPOSTリクエストを送信
     auto res = cli.Post("/v1/chat/completions", request_body.dump(), "application/json");
 
-    // 4. サーバーからの応答を処理
     if (res && res->status == 200) {
         try {
             json response_json = json::parse(res->body);
 
-            //std::cout << response_json << std::endl;
-            // "content" が存在し、かつ null でないことを確認
+            // デバッグ表示（必要に応じてコメントアウト）
+            // std::cout << response_json << std::endl;
+
             if (response_json.contains("choices") && !response_json["choices"].empty() &&
-                response_json["choices"][0].contains("message") &&
-                response_json["choices"][0]["message"].contains("content") &&
-                !response_json["choices"][0]["message"]["content"].is_null())
-            {
-                return response_json["choices"][0]["message"]["content"];
-            }
-            else {
-                std::cerr << "Warning: LLM response content is null or missing in the response structure." << std::endl;
-                std::cerr << "Response Body: " << res->body << std::endl;
-                return "エラー：有効な応答がありませんでした。";
+                response_json["choices"][0].contains("message")) {
+
+                auto& message = response_json["choices"][0]["message"];
+
+                // content (最終回答) の取得
+                if (message.contains("content") && !message["content"].is_null()) {
+                    result.content = message["content"];
+                    result.success = true;
+                } else {
+                     std::cerr << "Warning: content is null." << std::endl;
+                }
+
+                // reasoning_content (思考プロセス) の取得
+                // モデルによっては含まれない場合もあるためチェックする
+                if (message.contains("reasoning_content") && !message["reasoning_content"].is_null()) {
+                    result.reasoning_content = message["reasoning_content"];
+                } else {
+                    result.reasoning_content = "(No reasoning content provided)";
+                }
             }
         } catch (json::parse_error& e) {
-            std::cerr << "Error: Failed to parse JSON response." << std::endl;
-            std::cerr << "JSON parser error: " << e.what() << std::endl;
-            std::cerr << "Response Body: " << res->body << std::endl;
-            return "ERROR";
+            std::cerr << "Error: Failed to parse JSON response. " << e.what() << std::endl;
         }
     } else {
         std::cerr << "Error: Request failed." << std::endl;
-        if (res) {
-            std::cerr << "Status Code: " << res->status << std::endl;
-            std::cerr << "Response Body: " << res->body << std::endl;
-        } else {
-            auto err = res.error();
-            std::cerr << "HTTP Error: " << httplib::to_string(err) << std::endl;
-        }
-        return "ERROR";
     }
+
+    // 失敗時は content は空文字のまま、success は false
+    return result;
 }
 
 

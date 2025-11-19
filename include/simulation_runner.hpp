@@ -19,7 +19,8 @@ void runSurveySimulation(const std::vector<Person>& population,
                         const std::string& user_prompt_template,
                         std::vector<SurveyResult>& results,
                         IndividualResponseManager& responseManager,
-                        LlmQueryFunc query_func);
+                        LlmQueryFunc query_func,
+                        const std::string& log_filename);
 
 void runSurveySimulation_Parallel(const std::vector<Person>& population,
                                  const std::vector<Question>& questions,
@@ -29,7 +30,7 @@ void runSurveySimulation_Parallel(const std::vector<Person>& population,
 
 void runTestSurveySimulation(const std::vector<Person>& population,
                                 const std::vector<Question>& questions,
-                                const std::string& system_prompt_template,
+                                const std::map<std::string, std::string>& system_prompt_templates,
                                 const std::string& user_prompt_template);
 
 void exportResultsToFiles(const IndividualResponseManager& responseManager,
@@ -37,5 +38,9 @@ void exportResultsToFiles(const IndividualResponseManager& responseManager,
                                const std::vector<Question>& questions,
                                const std::string& individual_responses_path,
                                const std::string& merged_responses_path);
+
+void exportResultsByTemplate(const IndividualResponseManager& responseManager,
+                           const std::vector<Question>& questions,
+                           const std::string& template_name);
 
 #endif // SIMULATION_RUNNER_HPP

@@ -28,11 +28,12 @@ void worker_function(
 
         // 5．LLM問い合わせ、質問回答
         LLMParams params;
-        std::string content = queryLLM(generated_prompt, host, port,params);
-        std::cout << "回答番号: " << content << std::endl;
+        LLMResponse result = queryLLM(generated_prompt, host, port, params);
+        //std::string content = queryLLM(generated_prompt, host, port,params);
+        std::cout << "回答番号: " << result.content << std::endl;
 
         // 6. 回答の解析と結果のプッシュ
-        const int choice_number = parseLlmAnswer(content);
+        const int choice_number = parseLlmAnswer(result.content);
         std::cout << "Choice Number: " << choice_number << std::endl;
         result_queue.push({task.person.person_id, task.question.id, choice_number});
     }
