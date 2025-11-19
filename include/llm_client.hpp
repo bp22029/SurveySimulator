@@ -15,7 +15,7 @@ using json = nlohmann::json;
 
 // LLMのパラメータを管理する構造体
 struct LLMParams {
-    std::string model = "openai/gpt-oss-120b";
+    std::string model = "openai/gpt-oss-20b";
     std::string system_prompt;
     double temperature = 0.0;
     int seed = 42;
@@ -23,7 +23,7 @@ struct LLMParams {
     int max_tokens = 4096;
     double repetition_penalty = 1.1;
     // 必要に応じて他のパラメータを追加
-    double top_p = 0.05;
+    double top_p = 0.0;
     // std::vector<std::string> stop = {"\n", "。"};
 };
 struct LLMParamsForPersonality : public LLMParams {
@@ -44,18 +44,27 @@ struct LLMParamsForPersonality : public LLMParams {
     }
 };
 
+// 戻り値を格納する構造体を定義
+struct LLMResponse {
+    std::string content;           // 最終的な回答 (数字など)
+    std::string reasoning_content; // 思考プロセス
+    bool success = false;          // 通信成功フラグ
+};
+
 // ★ queryLLM と同じ「型」を持つ関数ポインタ（std::function）を定義
-using LlmQueryFunc = std::function<std::string(
-    const std::string&,
-    const std::string&,
-    int,
-    const LLMParams&
-)>;
+// using LlmQueryFunc = std::function<std::string(
+//     const std::string&,
+//     const std::string&,
+//     int,
+//     const LLMParams&
+// )>;
+
+using LlmQueryFunc = std::function<LLMResponse(const std::string&, const std::string&, int, const LLMParams&)>;
 
 //LLMに問い合わせを行う
 // std::string queryLLM(const std::string& prompt,const std::string& host, int port);
 
-std::string queryLLM(const std::string& prompt, const std::string& host, int port, const LLMParams& params);
+LLMResponse queryLLM(const std::string& prompt, const std::string& host, int port, const LLMParams& params);
 
 std::string queryLLMForPersonality(const std::string& prompt, const std::string& host, int port, const LLMParams& params);
 

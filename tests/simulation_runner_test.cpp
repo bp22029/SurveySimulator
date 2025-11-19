@@ -3,23 +3,34 @@
 #include "individual_response_manager.hpp"
 #include "person.hpp"
 #include "question.hpp"
+// LLMResponseの定義を知るために必要（定義されているヘッダーをインクルードしてください）
+#include "../include/llm_client.hpp"
 
 // ★「偽物」の関数を定義（モック）
-std::string MockQueryFunction(
+// 戻り値を std::string から LLMResponse に変更
+LLMResponse MockQueryFunction(
     const std::string& prompt,
     const std::string& host,
     int port,
     const LLMParams& params)
 {
+    LLMResponse res;
+    res.success = true; // テストなので通信成功とする
+    res.reasoning_content = "これはテスト用のモック思考プロセスです。"; // ダミーの思考
+
     // プロンプトに "Q1" が含まれていたら "1" を返す
     if (prompt.find("Q1") != std::string::npos) {
-        return "1";
+        res.content = "1";
+        return res;
     }
     // プロンプトに "Q2" が含まれていたら "3" を返す
     if (prompt.find("Q2") != std::string::npos) {
-        return "3";
+        res.content = "3";
+        return res;
     }
-    return "99"; // その他
+
+    res.content = "99"; // その他
+    return res;
 }
 
 TEST(SimulationRunnerTest, RunSimulationWithMock) {
@@ -34,7 +45,7 @@ TEST(SimulationRunnerTest, RunSimulationWithMock) {
     };
     std::string sys_tpl = "SYS";
     std::string user_tpl = "{質問}";
-    std::vector<SurveyResult> results; // (現在は使われていないが引数のために用意)
+    std::vector<SurveyResult> results;
 
     IndividualResponseManager manager; // ★ 検証用のマネージャー
 
@@ -46,8 +57,9 @@ TEST(SimulationRunnerTest, RunSimulationWithMock) {
         sys_tpl,
         user_tpl,
         results,
-        manager,           // ★ 検証用マネージャーを渡す
-        &MockQueryFunction // ★ 偽物の関数を渡す
+        manager,           // ★ 検証用マネージャー
+        &MockQueryFunction, // ★ 偽物の関数（型が合うようになりました）
+        "test_dummy_log.txt" // ★追加: テスト用のログファイル名
     );
 
     // 3. 検証 (Assert)

@@ -14,6 +14,7 @@
 #include <fstream>
 #include <vector>
 #include <string>
+#include <map>
 
 void runSurveySimulation_Parallel(const std::vector<Person>& population,
                                  const std::vector<Question>& questions,
@@ -91,24 +92,97 @@ void runSurveySimulation_Parallel(const std::vector<Person>& population,
 
 
 
-void runSurveySimulation(const std::vector<Person>& population,
-                        const std::vector<Question>& questions,
-                        const std::string& system_prompt_template,
-                        const std::string& user_prompt_template,
-                        std::vector<SurveyResult>& results,
-                        IndividualResponseManager& responseManager,
-                        LlmQueryFunc query_func) {
+// void runSurveySimulation(const std::vector<Person>& population,
+//                         const std::vector<Question>& questions,
+//                         const std::string& system_prompt_template,
+//                         const std::string& user_prompt_template,
+//                         std::vector<SurveyResult>& results,
+//                         IndividualResponseManager& responseManager,
+//                         LlmQueryFunc query_func) {
+//
+//     int total_simulations = population.size() * questions.size(); //本来はこちら
+//     //int total_simulations = 1 * questions.size(); //デバッグ用に最初の1人だけに制限
+//     int current_count = 0;
+//     std::string generated_system_prompt;
+//     std::string generated_user_prompt;
+//     //IndividualResponseManager responseManager;
+//     // const std::vector<std::pair<std::string, int>> servers = {
+//     //     {"127.0.0.1", 8000},
+//     //     {"127.0.0.1", 8001}
+//     // };
+//
+//     for (const auto& person : population) {
+//         for (int i = 0; i < questions.size(); ++i) {
+//             current_count++;
+//             std::cout << "\n[" << current_count << "/" << total_simulations << "] "
+//                       << "Agent ID: " << person.person_id << ", Question ID: " << questions[i].id << std::endl;
+//
+//             // プロンプト生成
+//             generated_system_prompt = generatePrompt(system_prompt_template, person, questions[i]);
+//             generated_user_prompt = generatePrompt(user_prompt_template, person, questions[i]);
+//
+//
+//             //　LLM問い合わせ、質問回答
+//             //std::string queryLLM(const std::string& prompt,const std::string& host, int port)
+//             // int server_select = current_count % servers.size();
+//
+//             LLMParams params;
+//             params.system_prompt = generated_system_prompt;
+//             std::string content;
+//             //content = queryLLM(generated_prompt,servers[server_select].first,servers[server_select].second);
+//             //content = queryLLM(generated_user_prompt,"127.0.0.1",8000,params);//修正必須
+//             content = query_func(generated_user_prompt,"127.0.0.1",8000,params);//修正必須
+//             std::cout << content << std::endl;
+//
+//             // 個人回答の記録
+//             //int choice_number = extractChoiceNumber(content);
+//             int choice_number = parseLlmAnswer(content);
+//             if (choice_number != -1) {
+//                 responseManager.recordResponse(person.person_id, questions[i].id, choice_number);
+//             }
+//             //　回答の解析と集計
+//             //parseAndRecordAnswer(content, questions[i], results[i]);
+//         }
+//         responseManager.printSummary();
+//     }
+//
+//
+// //     // 質問IDリストを作成
+// //     std::vector<std::string> question_ids;
+// //     for (const auto& q : questions) {
+// //         question_ids.push_back(q.id);
+// //     }
+// //     // CSVエクスポート
+// //     responseManager.exportToCSV("../../results/individual_responses.csv", question_ids);
+// //     responseManager.printSummary();
+// //
+// //     responseManager.exportMergedPopulationCSV("../../data/merged_population_responses.csv", population, question_ids );
+// }
 
-    int total_simulations = population.size() * questions.size(); //本来はこちら
-    //int total_simulations = 1 * questions.size(); //デバッグ用に最初の1人だけに制限
+void runSurveySimulation(const std::vector<Person>& population,
+                         const std::vector<Question>& questions,
+                         const std::string& system_prompt_template,
+                         const std::string& user_prompt_template,
+                         std::vector<SurveyResult>& results, // 今回は使用していないようですが維持
+                         IndividualResponseManager& responseManager,
+                         LlmQueryFunc query_func,
+                         const std::string& log_filename) { // ★追加: ログファイル名を受け取る
+
+    int total_simulations = population.size() * questions.size();
     int current_count = 0;
     std::string generated_system_prompt;
     std::string generated_user_prompt;
-    //IndividualResponseManager responseManager;
-    // const std::vector<std::pair<std::string, int>> servers = {
-    //     {"127.0.0.1", 8000},
-    //     {"127.0.0.1", 8001}
-    // };
+
+    // -------------------------------------------------------
+    // ★追加: ログファイルの作成・オープン
+    // -------------------------------------------------------
+    std::ofstream log_file(log_filename);
+    if (!log_file.is_open()) {
+        std::cerr << "Error: Could not open log file " << log_filename << std::endl;
+    } else {
+        log_file << "Experiment Simulation Log\n";
+        log_file << "==================================================\n";
+    }
 
     for (const auto& person : population) {
         for (int i = 0; i < questions.size(); ++i) {
@@ -120,42 +194,50 @@ void runSurveySimulation(const std::vector<Person>& population,
             generated_system_prompt = generatePrompt(system_prompt_template, person, questions[i]);
             generated_user_prompt = generatePrompt(user_prompt_template, person, questions[i]);
 
-
-            //　LLM問い合わせ、質問回答
-            //std::string queryLLM(const std::string& prompt,const std::string& host, int port)
-            // int server_select = current_count % servers.size();
-
+            // LLMパラメータ設定
             LLMParams params;
             params.system_prompt = generated_system_prompt;
-            std::string content;
-            //content = queryLLM(generated_prompt,servers[server_select].first,servers[server_select].second);
-            //content = queryLLM(generated_user_prompt,"127.0.0.1",8000,params);//修正必須
-            content = query_func(generated_user_prompt,"127.0.0.1",8000,params);//修正必須
-            std::cout << content << std::endl;
 
-            // 個人回答の記録
-            //int choice_number = extractChoiceNumber(content);
-            int choice_number = parseLlmAnswer(content);
-            if (choice_number != -1) {
-                responseManager.recordResponse(person.person_id, questions[i].id, choice_number);
+            // ★変更: 戻り値を string ではなく LLMResponse で受け取る
+            LLMResponse result = query_func(generated_user_prompt, "127.0.0.1", 8000, params);
+
+            std::cout << result.content << std::endl; // コンソールには回答のみ表示
+
+            // -------------------------------------------------------
+            // ★追加: ログファイルへの書き込み
+            // -------------------------------------------------------
+            if (log_file.is_open()) {
+                log_file << "--------------------------------------------------\n";
+                log_file << "Agent ID: " << person.person_id << " | Question ID: " << questions[i].id << "\n";
+                log_file << "System Prompt (First 50 chars): " << generated_system_prompt.substr(0, 50) << "...\n"; // 長いので省略表示
+
+                log_file << "\n[Reasoning Content]\n";
+                log_file << result.reasoning_content << "\n";
+
+                log_file << "\n[Final Answer]\n";
+                log_file << result.content << "\n";
+                log_file << "\n";
+
+                log_file.flush(); // 安全のため都度書き込み
             }
-            //　回答の解析と集計
-            //parseAndRecordAnswer(content, questions[i], results[i]);
+
+            // 個人回答の記録 (result.success のチェック推奨)
+            if (result.success) {
+                // content ではなく result.content を使用
+                int choice_number = parseLlmAnswer(result.content);
+                if (choice_number != -1) {
+                    responseManager.recordResponse(person.person_id, questions[i].id, choice_number);
+                }
+            } else {
+                 std::cerr << "Error: LLM query failed for Agent " << person.person_id << std::endl;
+            }
         }
+        // エージェント1人終わるごとにサマリを表示したければここで
         responseManager.printSummary();
     }
 
-
-//     // 質問IDリストを作成
-//     std::vector<std::string> question_ids;
-//     for (const auto& q : questions) {
-//         question_ids.push_back(q.id);
-//     }
-//     // CSVエクスポート
-//     responseManager.exportToCSV("../../results/individual_responses.csv", question_ids);
-//     responseManager.printSummary();
-//
-//     responseManager.exportMergedPopulationCSV("../../data/merged_population_responses.csv", population, question_ids );
+    // 最後にファイルを閉じる
+    log_file.close();
 }
 
 // ★ 引数を、出力したいファイルパス2つに変更
@@ -175,69 +257,112 @@ void exportResultsToFiles(const IndividualResponseManager& responseManager,
 }
 
 void runTestSurveySimulation(const std::vector<Person>& population,
-                                const std::vector<Question>& questions,
-                                const std::string& system_prompt_template,
-                                const std::string& user_prompt_template) {
+                             const std::vector<Question>& questions,
+                             const std::map<std::string, std::string>& system_prompt_templates,
+                             const std::string& user_prompt_template) {
 
-    int total_simulations = population.size() * questions.size();
-    int current_count = 0;
-    IndividualResponseManager responseManager;
-
-    for (const auto& person : population) {
-        //LLMParamsForPersonality paramsForPersonality;
-        LLMParams params;
-        // const std::string test_prompt = "# 個性"
-        //                                 "あなたの性格をビッグファイブの5つの特性で表すと、以下のようになります。"
-        //                                 "性格特性 (0が最も低く、1が最も高い):"
-        //                                   "- 否定的情動性: 0.65"
-        //                                   "- 勤勉性: 0.62"
-        //                                   "- 外向性: 0.62"
-        //                                   "- 協調性: 0.62"
-        //                                   "- 開放性: 0.58)";
-        // std::string personality_info = queryLLM(test_prompt,"127.0.0.1",8000,paramsForPersonality);
-        // std::cout << "Personality Info: " << personality_info << std::endl;
-
-        for (int i = 0; i < questions.size(); ++i) {
-            current_count++;
-            std::cout << "\n[" << current_count << "/" << total_simulations << "] "
-                      << "Agent ID: " << person.person_id << ", Question ID: " << questions[i].id << std::endl;
-
-            // プロンプト生成
-            std::string generated_system_prompt;
-            std::string generated_user_prompt;
-            generated_system_prompt = generatePrompt(system_prompt_template, person, questions[i]);
-            generated_user_prompt = generatePrompt(user_prompt_template, person, questions[i]);
-
-            // std::cout << "Generated System Prompt:\n" << generated_system_prompt << std::endl;
-            // std::cout << "Generated User Prompt:\n" << generated_user_prompt << std::endl;
-
-            //　LLM問い合わせ、質問回答
-            //std::string queryLLM(const std::string& prompt,const std::string& host, int port)
-            // int server_select = current_count % servers.size();
-
-            LLMParams params;
-            params.system_prompt = generated_system_prompt;
-            std::string content;
-            //content = queryLLM(generated_prompt,servers[server_select].first,servers[server_select].second);
-            content = queryLLM(generated_user_prompt,"127.0.0.1",8000,params);//修正必須
-            std::cout << content << std::endl;
-
-            // 個人回答の記録
-            //int choice_number = extractChoiceNumber(content);
-            int choice_number = parseLlmAnswer(content);
-            if (choice_number != -1) {
-                responseManager.recordResponse(person.person_id, questions[i].id, choice_number);
-            }
-            //　回答の解析と集計
-            //parseAndRecordAnswer(content, questions[i], results[i]);
-        }
-        responseManager.printSummary();
+    if (population.empty() || questions.empty() || system_prompt_templates.empty()) {
+        std::cerr << "Error: Invalid input parameters" << std::endl;
+        return;
     }
+
+    int total_simulations = population.size() * questions.size() * system_prompt_templates.size();
+    int current_count = 0;
+
+    // --- System Prompt Template のループ ---
+    for (const auto& [template_name, system_prompt_template] : system_prompt_templates) {
+        std::cout << "\n=== Using System Prompt Template: " << template_name << " ===" <<  std::endl;
+
+        // -------------------------------------------------------
+        // ログファイルの作成・オープン
+        // ファイル名例: "log_bigfive.txt", "log_complex.txt" など
+        // 保存先ディレクトリを変えたい場合は "logs/log_" + ... としてください
+        // -------------------------------------------------------
+        std::string filename = "log_" + template_name + ".txt";
+        std::ofstream log_file(filename);
+
+        if (!log_file.is_open()) {
+             std::cerr << "Error: Could not open log file " << filename << std::endl;
+             // ログが開けなくても続行するか、returnするかは要件次第ですが、今回は続行します
+        } else {
+            // ファイルヘッダー書き込み
+            log_file << "Simulation Log for Template: " << template_name << "\n";
+            log_file << "==================================================\n";
+        }
+
+        IndividualResponseManager responseManager;
+
+        for (const auto& person : population) {
+            LLMParams params;
+
+            for (int i = 0; i < questions.size(); ++i) {
+                current_count++;
+                std::cout << "\n[" << current_count << "/" << total_simulations << "] "
+                          << "Agent ID: " << person.person_id << ", Question ID: " << questions[i].id << std::endl;
+
+                // プロンプト生成
+                std::string generated_system_prompt = generatePrompt(system_prompt_template, person, questions[i]);
+                std::string generated_user_prompt = generatePrompt(user_prompt_template, person, questions[i]);
+
+                // パラメータ設定
+                params.system_prompt = generated_system_prompt;
+
+                // LLMへの問い合わせ (戻り値が LLMResponse になりました)
+                LLMResponse result = queryLLM(generated_user_prompt, "127.0.0.1", 8000, params);
+
+                std::cout << "Answer: " << result.content << std::endl; // コンソールには回答のみ表示
+
+                // -------------------------------------------------------
+                // ログファイルへの書き込み
+                // -------------------------------------------------------
+                if (log_file.is_open()) {
+                    log_file << "--------------------------------------------------\n";
+                    log_file << "Agent ID: " << person.person_id << " | Question ID: " << questions[i].id << "\n";
+                    log_file << "Model: " << params.model << " | Seed: " << params.seed << "\n";
+
+                    log_file << "\n[Reasoning Content]\n";
+                    log_file << result.reasoning_content << "\n";
+
+                    log_file << "\n[Final Answer]\n";
+                    log_file << result.content << "\n";
+                    log_file << "\n"; // 空行
+
+                    // バッファをフラッシュして、プログラムが落ちてもログが残るようにする（速度優先なら外してもOK）
+                    log_file.flush();
+                }
+
+                // 以前の処理の継続
+                if (result.success) {
+                    int choice_number = parseLlmAnswer(result.content);
+                    if (choice_number != -1) {
+                        responseManager.recordResponse(person.person_id, questions[i].id, choice_number);
+                    }
+                } else {
+                    std::cerr << "LLM Query Failed." << std::endl;
+                }
+            }
+        }
+
+        // Summary表示
+        responseManager.printSummary();
+
+        // CSV出力
+        exportResultsByTemplate(responseManager, questions, template_name);
+
+        // ファイルを閉じる（デストラクタで自動で閉じられますが、明示的に）
+        log_file.close();
+    }
+}
+
+void exportResultsByTemplate(const IndividualResponseManager& responseManager,
+                           const std::vector<Question>& questions,
+                           const std::string& template_name) {
     std::vector<std::string> question_ids;
     for (const auto& q : questions) {
         question_ids.push_back(q.id);
     }
-    responseManager.exportToCSV("../../results/for_test_individual_responses.csv", question_ids);
-    responseManager.printSummary();
 
+    std::string filename = "../../results/for_test_individual_responses_" + template_name + ".csv";
+    responseManager.exportToCSV(filename, question_ids);
+    responseManager.printSummary();
 }
