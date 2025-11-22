@@ -33,7 +33,8 @@ void worker_function(
         std::cout << "回答番号: " << result.content << std::endl;
 
         // 6. 回答の解析と結果のプッシュ
-        const int choice_number = parseLlmAnswer(result.content);
+        //const int choice_number = parseLlmAnswer(result.content);
+        const int choice_number = extractAnswerFromTags(result.content);
         std::cout << "Choice Number: " << choice_number << std::endl;
         result_queue.push({task.person.person_id, task.question.id, choice_number});
     }
