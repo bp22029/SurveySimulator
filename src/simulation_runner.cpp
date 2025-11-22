@@ -350,7 +350,8 @@ void runTestSurveySimulation(const std::vector<Person>& population,
 
                 // 以前の処理の継続
                 if (result.success) {
-                    int choice_number = parseLlmAnswer(result.content);
+                    // int choice_number = parseLlmAnswer(result.content);
+                    int choice_number = extractAnswerFromTags(result.content);
                     if (choice_number != -1) {
                         responseManager.recordResponse(person.person_id, questions[i].id, choice_number);
                     }

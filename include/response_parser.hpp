@@ -9,4 +9,8 @@ int extractChoiceNumber(const std::string& json_response);
 
 int parseLlmAnswer(const std::string& llmResponse);
 
+int extractAnswerFromTags(const std::string& text);
+
+std::string extractThinkingLog(const std::string& text);
+
 #endif // RESPONSE_PARSER_HPP
