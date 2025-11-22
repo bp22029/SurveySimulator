@@ -15,6 +15,9 @@
 #include <vector>
 #include <string>
 #include <map>
+#include <filesystem> // C++17以降が必要
+namespace fs = std::filesystem;
+#include <time.h>
 
 void runSurveySimulation_Parallel(const std::vector<Person>& population,
                                  const std::vector<Question>& questions,
@@ -278,7 +281,18 @@ void runTestSurveySimulation(const std::vector<Person>& population,
         // ファイル名例: "log_bigfive.txt", "log_complex.txt" など
         // 保存先ディレクトリを変えたい場合は "logs/log_" + ... としてください
         // -------------------------------------------------------
-        std::string filename = "log_" + template_name + ".txt";
+        std::string log_dir_path = "../../log/";
+        // ディレクトリが存在するか確認し、なければ作成する（エラー回避）
+        // 現在日時を取得してファイル名に使う
+        if (!fs::exists(log_dir_path)) {
+            fs::create_directories(log_dir_path);
+        }
+        time_t now = time(0);
+        tm* ltm = localtime(&now);
+        char timestamp[20];
+        strftime(timestamp, sizeof(timestamp), "%Y%m%d_%H%M%S", ltm);
+
+        std::string filename = log_dir_path + "log_" + template_name + "_" + timestamp + ".txt";
         std::ofstream log_file(filename);
 
         if (!log_file.is_open()) {
@@ -318,7 +332,10 @@ void runTestSurveySimulation(const std::vector<Person>& population,
                 if (log_file.is_open()) {
                     log_file << "--------------------------------------------------\n";
                     log_file << "Agent ID: " << person.person_id << " | Question ID: " << questions[i].id << "\n";
+                    // parametersの内容もログに記録
                     log_file << "Model: " << params.model << " | Seed: " << params.seed << "\n";
+                    log_file << "Temperature: " << params.temperature << "\n";
+                    log_file << "Repetition penalty" << params.repetition_penalty << "\n";
 
                     log_file << "\n[Reasoning Content]\n";
                     log_file << result.reasoning_content << "\n";
@@ -362,7 +379,11 @@ void exportResultsByTemplate(const IndividualResponseManager& responseManager,
         question_ids.push_back(q.id);
     }
 
-    std::string filename = "../../results/for_test_individual_responses_" + template_name + ".csv";
+    time_t now = time(0);
+    tm* ltm = localtime(&now);
+    char timestamp[20];
+    strftime(timestamp, sizeof(timestamp), "%Y%m%d_%H%M%S", ltm);
+    std::string filename = "../../results/for_test_individual_responses_" + template_name +"_"+ timestamp +  ".csv";
     responseManager.exportToCSV(filename, question_ids);
     responseManager.printSummary();
 }
