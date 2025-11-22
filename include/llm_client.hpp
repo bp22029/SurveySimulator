@@ -15,34 +15,35 @@ using json = nlohmann::json;
 
 // LLMのパラメータを管理する構造体
 struct LLMParams {
-    std::string model = "openai/gpt-oss-20b";
+    std::string model = "google/gemma-3-12b-it";
     std::string system_prompt;
     double temperature = 0.0;
     int seed = 42;
     bool stream = false;
-    int max_tokens = 4096;
-    double repetition_penalty = 1.1;
+    int max_tokens = 2048;
+    double repetition_penalty = 1.0;
     // 必要に応じて他のパラメータを追加
     double top_p = 0.0;
+    int top_k = 1;
     // std::vector<std::string> stop = {"\n", "。"};
 };
-struct LLMParamsForPersonality : public LLMParams {
-    LLMParamsForPersonality() {
-        // 人格推定・BFI2向けの推奨既定値（必要に応じて調整）
-        system_prompt =
-            "あなたは性格の専門家です。性格の特性を表す数値から性格を推定し、人物像を記述してください。"
-            "ビッグファイブの各特性について、1行ずつ説明してください。"
-            "総合的な人物像を３行程度で最後に記述してください。";
-        temperature = 0.2;
-        top_p = 0.05;
-        max_tokens = 4096;
-        repetition_penalty = 1.1;
-        seed = 42;
-        stream = false;
-        // 必要ならモデルも専用に変更
-        // model = "openai/gpt-oss-20b";
-    }
-};
+// struct LLMParamsForPersonality : public LLMParams {
+//     LLMParamsForPersonality() {
+//         // 人格推定・BFI2向けの推奨既定値（必要に応じて調整）
+//         system_prompt =
+//             "あなたは性格の専門家です。性格の特性を表す数値から性格を推定し、人物像を記述してください。"
+//             "ビッグファイブの各特性について、1行ずつ説明してください。"
+//             "総合的な人物像を３行程度で最後に記述してください。";
+//         temperature = 0.2;
+//         top_p = 0.05;
+//         max_tokens = 4096;
+//         repetition_penalty = 1.1;
+//         seed = 42;
+//         stream = false;
+//         // 必要ならモデルも専用に変更
+//         // model = "openai/gpt-oss-20b";
+//     }
+// };
 
 // 戻り値を格納する構造体を定義
 struct LLMResponse {

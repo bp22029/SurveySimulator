@@ -45,8 +45,9 @@ LLMResponse queryLLM(const std::string& prompt, const std::string& host, int por
     request_body["seed"] = params.seed;
     request_body["stream"] = params.stream;
     request_body["max_tokens"] = params.max_tokens;
-    request_body["repetition_penalty"] = params.repetition_penalty;
-    if (params.top_p > 0.0) request_body["top_p"] = params.top_p;
+    //request_body["repetition_penalty"] = params.repetition_penalty;
+    //request_body["top_k"] = params.top_k;
+    //if (params.top_p > 0.0) request_body["top_p"] = params.top_p;
 
     auto res = cli.Post("/v1/chat/completions", request_body.dump(), "application/json");
 
