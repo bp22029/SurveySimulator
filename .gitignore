@@ -8,3 +8,7 @@
 /dataSources.local.xml
 data/2015_001_8+_47356.csv
 .idea
+log/
+results/
+build/
+cmake-build-*/
