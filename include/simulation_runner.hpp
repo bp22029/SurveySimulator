@@ -43,4 +43,29 @@ void exportResultsByTemplate(const IndividualResponseManager& responseManager,
                            const std::vector<Question>& questions,
                            const std::string& template_name);
 
+void runTestSurveySimulation_Parallel(
+    const std::vector<Person>& population,
+    const std::vector<Question>& questions,
+    const std::map<std::string, std::string>& system_prompt_templates,
+    const std::string& user_prompt_template,
+    unsigned int num_threads // スレッド数
+);
+
+void runSurveySimulation_Resident(
+    const std::vector<Person>& population,
+    const std::vector<Question>& questions,
+    const std::string& system_prompt_template,
+    const std::string& user_prompt_template,
+    IndividualResponseManager& responseManager
+);
+
+std::string extractThinkingContent(const std::string& text);
+
+void runTestSurveySimulation_Resident(
+    const std::vector<Person>& population,
+    const std::vector<Question>& questions,
+    const std::map<std::string, std::string>& system_prompt_templates,
+    const std::string& user_prompt_template
+);
+
 #endif // SIMULATION_RUNNER_HPP
