@@ -55,10 +55,10 @@ int main() {
 
     std::map<std::string, std::string> system_prompt_templates = {
         {"bigfive", readPromptTemplate(system_template_path_bigfive)},
-        {"bfi2", readPromptTemplate(system_template_path_bfi2)},
-        {"schwartz", readPromptTemplate(system_template_path_schwartz)},
-        {"pvq", readPromptTemplate(system_template_path_pvq)},
-        {"complex", readPromptTemplate(system_template_path_complex)}
+        // {"bfi2", readPromptTemplate(system_template_path_bfi2)},
+        // {"schwartz", readPromptTemplate(system_template_path_schwartz)},
+        // {"pvq", readPromptTemplate(system_template_path_pvq)},
+        // {"complex", readPromptTemplate(system_template_path_complex)}
     };
 
     std::string system_prompt_template = readPromptTemplate(system_template_path_bigfive);
@@ -79,14 +79,23 @@ int main() {
 
     IndividualResponseManager responseManager;
 
+    //vLLMウォームアップ
+    //runTestSurveySimulation_Resident(test_population,questions,system_prompt_templates,user_prompt_template);
+
     // 4. シミュレーションの実行
-    std::string log_name = "experiment_simulation_log.txt";
+    //std::string log_name = "experiment_simulation_log.txt";
     //runSurveySimulation(population, questions, system_prompt_template,user_prompt_template, results, responseManager, &queryLLM, log_name);
     //runSurveySimulation_Parallel(population, questions, prompt_template, results, 64); // 64スレッドで実行
-    //runSurveySimulation_Resident(test_population, questions, system_prompt_template,user_prompt_template, responseManager);
+
+    // runSurveySimulation_Resident(population,test_population, questions, system_prompt_template,user_prompt_template, responseManager);
+    //
+    // responseManager.printSummary();
+    // exportResultsToFiles(responseManager,population,questions,
+    //                      "../../results/individual_responses.csv",
+    //                      "../../data/merged_population_responses.csv");
 
     // テスト用シミュレーションの実行
-    // runTestSurveySimulation(test_population, questions, system_prompt_templates, user_prompt_template);
+    runTestSurveySimulation(test_population, questions, system_prompt_templates, user_prompt_template);
 
     //unsigned int num_threads = 16;
 
@@ -98,7 +107,7 @@ int main() {
     //     num_threads
     // );
 
-    runTestSurveySimulation_Resident(test_population,questions,system_prompt_templates,user_prompt_template);
+    // runTestSurveySimulation_Resident(test_population,questions,system_prompt_templates,user_prompt_template);
 
     // exportResultsToFiles(responseManager,population,questions,
     //                      "../../results/individual_responses.csv",

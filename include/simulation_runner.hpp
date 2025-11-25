@@ -53,6 +53,7 @@ void runTestSurveySimulation_Parallel(
 
 void runSurveySimulation_Resident(
     const std::vector<Person>& population,
+    const std::vector<Person>& test_population,
     const std::vector<Question>& questions,
     const std::string& system_prompt_template,
     const std::string& user_prompt_template,
