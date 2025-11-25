@@ -50,25 +50,6 @@ def main():
         seed=42
     )
 
-    # 【追加】ウォームアップ：ダミーデータを1回計算して、CUDA Graphを作らせておく
-    # 本番に近い長さのダミープロンプトを、本番のバッチサイズ(64)以上で投げる
-    # ここでは念のため 128件 ほど投げて、内部のバッチ処理を確実に回す
-    dummy_prompt_text = "あなたは役に立つAIアシスタントです。\n\n自己紹介をしてください。"
-
-    # チャットテンプレート適用済みの形式でダミーデータを作成
-    dummy_messages = [{"role": "user", "content": dummy_prompt_text}]
-    dummy_formatted_prompt = tokenizer.apply_chat_template(
-        dummy_messages, tokenize=False, add_generation_prompt=True
-    )
-
-    # リストにする（数は適当で良いですが、vLLMの内部バッチが走る程度に多くする）
-    warmup_prompts = [dummy_formatted_prompt] * 200
-
-    # 推論実行（結果は捨てる）
-    llm.generate(warmup_prompts, sampling_params)
-
-    print(">>> [Python] ウォームアップ完了。Resident Workerを開始します。")
-    # ----------------------------------------------------------------
 
     print(f">>> [Python] 準備完了！ '{REQUEST_FILE}' を監視しています...")
 

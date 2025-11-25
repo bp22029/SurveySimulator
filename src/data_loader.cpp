@@ -10,8 +10,12 @@
 #include <chrono>
 
 void randomBigFive(Person& person) {
-    static std::random_device rd;
-    static std::mt19937 gen(rd());
+    // static std::random_device rd;
+    // static std::mt19937 gen(rd());
+
+    // 修正後: シードを固定する（決定論的）
+    // これにより、毎回必ず同じ乱数列が生成されます
+    static std::mt19937 gen(42);
     static std::uniform_real_distribution<float> dis(0.0f, 1.0f);
 
     person.personality.neuroticism.score = dis(gen);

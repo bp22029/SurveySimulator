@@ -19,6 +19,7 @@
 namespace fs = std::filesystem;
 #include <time.h>
 #include "nlohmann/json.hpp"
+#include "../include/llm_offline.hpp"
 
 using json = nlohmann::json;
 
@@ -527,8 +528,11 @@ const std::string BRIDGE_DIR = "/home/bp22029/vllm_bridge";
 const std::string REQUEST_FILE = BRIDGE_DIR + "/bridge_request.json";
 const std::string RESPONSE_FILE = BRIDGE_DIR + "/bridge_response.json";
 
+
+
 void runSurveySimulation_Resident(
     const std::vector<Person>& population,
+    const std::vector<Person>& test_population,
     const std::vector<Question>& questions,
     const std::string& system_prompt_template,
     const std::string& user_prompt_template,
@@ -539,92 +543,50 @@ void runSurveySimulation_Resident(
         fs::create_directories(BRIDGE_DIR);
     }
 
-    // 2. リクエストデータの作成
-    //    populationが1人なら52件、403人なら20956件のリストになります
-    std::cout << "[C++] Generating prompts for " << population.size() << " people..." << std::endl;
+    IndividualResponseManager responseManager_for_warmup;
 
-    json requests = json::array();
+    std::cout << "[C++] Warming up..." << std::endl;
+    for (const auto& person : test_population) {
+        std::cout << "[C++] Warming up with Agent ID: " << person.person_id << "..." << std::endl;
+        sendRequestAndReceiveResponse(
+            person,
+            questions,
+            system_prompt_template,
+            user_prompt_template,
+            responseManager_for_warmup,
+            nullptr // ログファイルポインタは渡さない
+        );
+    }
 
+    // ログファイルの準備 (ファイル名は適宜設定)
+    time_t now = time(0);
+    tm* ltm = localtime(&now);
+    char timestamp[20];
+    strftime(timestamp, sizeof(timestamp), "%Y%m%d_%H%M%S", ltm);
+    // ... (ログファイルオープンのコード) ...
+    std::string log_filename = std::string("../../log/log_experiment_") + timestamp + ".txt"; // 例
+    std::ofstream log_file(log_filename);
+
+    int count = 0;
     for (const auto& person : population) {
-        for (const auto& q : questions) {
-            std::string system_prompt = generatePrompt(system_prompt_template, person, q);
-            std::string user_prompt = generatePrompt(user_prompt_template, person, q);
+        count++;
+        std::cout << "[C++] Processing Agent " << count << "/" << population.size()
+                  << " (ID: " << person.person_id << ")..." << std::endl;
 
-            // IDは "personID_questionID" の形式にしておくと復元が楽です
-            std::string id = std::to_string(person.person_id) + "_" + q.id;
+        // ★ここで「1人分(52問)」を処理する関数を呼ぶ
+        //   この関数の中で ファイル書き込み -> 待機 -> 読み込み が完結します
+        sendRequestAndReceiveResponse(
+            person,
+            questions,
+            system_prompt_template,
+            user_prompt_template,
+            responseManager,
+            &log_file // ログファイルポインタを渡す
+        );
 
-            requests.push_back({
-                {"id", id},
-                {"system_prompt", system_prompt},
-                {"user_prompt", user_prompt}
-            });
-        }
     }
-
-    // 3. リクエストファイルの書き出し
-    //    (Pythonが読み込み中にクラッシュしないよう、一時ファイルを作ってリネームするのがベストですが、
-    //     今回は簡易的に既存ファイルを消してから書き込みます)
-    if (fs::exists(RESPONSE_FILE)) fs::remove(RESPONSE_FILE); // 前回の結果があれば消す
-
-    std::ofstream req_file(REQUEST_FILE);
-    req_file << requests.dump(); // 圧縮して書き込み
-    req_file.close();
-
-    std::cout << "[C++] Request file created. Waiting for Python worker..." << std::endl;
-
-    // 4. 応答待ち (ポーリング)
-    while (true) {
-        if (fs::exists(RESPONSE_FILE)) {
-            // 書き込み完了待ち（ファイルのロック機構がないため、安全マージンをとる）
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
-            break;
-        }
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-    }
-
-    std::cout << "[C++] Response received! Processing results..." << std::endl;
-
-    // 5. 結果の読み込みと集計
-    std::ifstream res_file(RESPONSE_FILE);
-    json responses;
-    try {
-        res_file >> responses;
-    } catch (const json::parse_error& e) {
-        std::cerr << "[C++] JSON Parse Error: " << e.what() << std::endl;
-        return;
-    }
-    res_file.close();
-
-    // 処理が終わったリクエスト/レスポンスファイルは削除しておく
-    // (Python側でREQUEST_FILEは消えているはずですが、念のため)
-    if (fs::exists(RESPONSE_FILE)) fs::remove(RESPONSE_FILE);
-
-    // 6. マネージャーへの記録
-    int success_count = 0;
-    for (const auto& item : responses) {
-        std::string id_str = item["id"];
-        std::string answer_text = item["response"];
-
-        // IDから person_id と question_id を復元 ("1_dq1" -> 1, "dq1")
-        size_t sep_pos = id_str.find('_');
-        if (sep_pos == std::string::npos) continue;
-
-        int p_id = std::stoi(id_str.substr(0, sep_pos));
-        std::string q_id = id_str.substr(sep_pos + 1);
-
-        // 回答の抽出（既存のパーサーを利用）
-        int choice = extractAnswerFromTags(answer_text);
-
-        if (choice != -1) {
-            responseManager.recordResponse(p_id, q_id, choice);
-            success_count++;
-        } else {
-            // パース失敗時のログなど
-            // std::cerr << "Parse failed for Agent " << p_id << std::endl;
-        }
-    }
-
-    std::cout << "[C++] Batch processing completed. " << success_count << " responses recorded." << std::endl;
+    // 最後にログファイルを閉じる
+    if (log_file.is_open()) log_file.close();
 }
 
 // ログ用に思考部分を抽出するヘルパー関数
@@ -655,145 +617,75 @@ void runTestSurveySimulation_Resident(
 
     int total_tasks_per_template = population.size() * questions.size();
 
+
+    IndividualResponseManager responseManager_for_warmup;
+    std::string system_prompt_template_warmup = system_prompt_templates.begin()->second;
+
+    std::cout << "[C++] Warming up..." << std::endl;
+    for (const auto& person : population) {
+        std::cout << "[C++] Warming up with Agent ID: " << person.person_id << "..." << std::endl;
+        sendRequestAndReceiveResponse(
+            person,
+            questions,
+            system_prompt_template_warmup,
+            user_prompt_template,
+            responseManager_for_warmup,
+            nullptr // ログファイルポインタは渡さない
+        );
+    }
+
     // --- System Prompt Template のループ ---
     for (const auto& [template_name, system_prompt_template] : system_prompt_templates) {
-        std::cout << "\n=== [Resident] Using System Prompt Template: " << template_name << " ===" << std::endl;
+        std::cout << "\n=== [Resident] Using Template: " << template_name << " ===" << std::endl;
 
-        // 1. ログファイルの準備
-        std::string log_dir_path = "../../log/";
-        if (!fs::exists(log_dir_path)) fs::create_directories(log_dir_path);
-
+        // ログファイルの準備 (ファイル名は適宜設定)
         time_t now = time(0);
         tm* ltm = localtime(&now);
         char timestamp[20];
         strftime(timestamp, sizeof(timestamp), "%Y%m%d_%H%M%S", ltm);
-
-        std::string log_filename = log_dir_path + "log_" + template_name + "_" + timestamp + ".txt";
+        // ... (ログファイルオープンのコード) ...
+        std::string log_filename = "../../log/log_" + template_name + "_" + timestamp + ".txt"; // 例
         std::ofstream log_file(log_filename);
-
-        if (log_file.is_open()) {
-            log_file << "Simulation Log for Template: " << template_name << " (Offline/Resident Mode)\n";
-            log_file << "==================================================\n";
-        }
 
         IndividualResponseManager responseManager;
 
-        // 2. 全リクエストデータの作成 (Batch Generation)
-        std::cout << "[C++] Generating " << total_tasks_per_template << " prompts..." << std::endl;
-        json requests = json::array();
 
-        // ID紐付け用マップ (id -> {person_index, question_index})
-        // ※レスポンスの順番が変わっても大丈夫なようにIDで管理します
-        // ただし今回はシンプルに文字列IDから復元します
+        // ---------------------------------------------------------
+        // ★ここが変更点: 全員まとめてではなく、一人ずつループして関数を呼ぶ
+        // ---------------------------------------------------------
 
+        // まずウォームアップ (最初の1人は捨てデータとして実行する場合)
+        // ※Python側でヘビーウォームアップ済みなら、ここはスキップしてもOKですが
+        //  念を入れるなら population[0] を一度空回しすると確実です。
+
+
+        //sendRequestAndReceiveResponse(population[0], questions, system_prompt_template, user_prompt_template, responseManager, nullptr);
+        // ウォームアップ結果は responseManager に入ってしまうので、必要ならクリアするか、
+        // 専用のダミーPersonを用意して投げると良いです。
+
+
+        int count = 0;
         for (const auto& person : population) {
-            for (const auto& q : questions) {
-                std::string sys_prompt = generatePrompt(system_prompt_template, person, q);
-                std::string usr_prompt = generatePrompt(user_prompt_template, person, q);
+            count++;
+            std::cout << "[C++] Processing Agent " << count << "/" << population.size()
+                      << " (ID: " << person.person_id << ")..." << std::endl;
 
-                // ID生成: "personID_questionID"
-                std::string id = std::to_string(person.person_id) + "_" + q.id;
-
-                requests.push_back({
-                    {"id", id},
-                    {"system_prompt", sys_prompt},
-                    {"user_prompt", usr_prompt}
-                });
-            }
+            // ★ここで「1人分(52問)」を処理する関数を呼ぶ
+            //   この関数の中で ファイル書き込み -> 待機 -> 読み込み が完結します
+            sendRequestAndReceiveResponse(
+                person,
+                questions,
+                system_prompt_template,
+                user_prompt_template,
+                responseManager,
+                &log_file // ログファイルポインタを渡す
+            );
         }
 
-        // 3. リクエストファイルの書き出し (アトミック更新)
-        if (fs::exists(RESPONSE_FILE)) fs::remove(RESPONSE_FILE);
-
-        // (1) まず一時ファイル名で書き込む
-        std::string temp_file_path = REQUEST_FILE + ".tmp";
-        std::ofstream req_file(temp_file_path);
-        req_file << requests.dump();
-        req_file.close(); // ここで書き込みを完全に終わらせる
-
-        // (2) 書き込み完了後に、本番ファイル名にリネームする
-        //     この操作は一瞬で完了するため、Pythonが途中経過を見ることはない
-        fs::rename(temp_file_path, REQUEST_FILE);
-
-        std::cout << "[C++] Request file created. Waiting for Python worker..." << std::endl;
-
-        std::cout << "[C++] Waiting for Python worker..." << std::endl;
-
-        // 4. 応答待ち (ポーリング)
-        while (true) {
-            if (fs::exists(RESPONSE_FILE)) {
-                // 書き込み完了待ち
-                std::this_thread::sleep_for(std::chrono::milliseconds(100));
-                break;
-            }
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
-        }
-
-        std::cout << "[C++] Processing results..." << std::endl;
-
-        // 5. 結果の読み込み
-        std::ifstream res_file(RESPONSE_FILE);
-        json responses;
-        try {
-            res_file >> responses;
-        } catch (const json::parse_error& e) {
-            std::cerr << "[C++] JSON Parse Error: " << e.what() << std::endl;
-            continue; // このテンプレートはスキップ
-        }
-        res_file.close();
-
-        // 後始末
-        if (fs::exists(RESPONSE_FILE)) fs::remove(RESPONSE_FILE);
-
-        // 6. 結果の記録とログ出力
-        int processed_count = 0;
-        for (const auto& item : responses) {
-            std::string id_str = item["id"];
-            std::string full_response = item["response"];
-
-            // IDから person_id と question_id を復元
-            size_t sep_pos = id_str.find('_');
-            if (sep_pos == std::string::npos) continue;
-            int p_id = std::stoi(id_str.substr(0, sep_pos));
-            std::string q_id = id_str.substr(sep_pos + 1);
-
-            // 思考部分と回答部分の抽出
-            std::string thinking = extractThinkingContent(full_response);
-            int choice = extractAnswerFromTags(full_response);
-
-            // ログファイルへの書き込み (以前のフォーマットを再現)
-            if (log_file.is_open()) {
-                log_file << "--------------------------------------------------\n";
-                log_file << "Agent ID: " << p_id << " | Question ID: " << q_id << "\n";
-                log_file << "Model: google/gemma-3-12b-it | Seed: 42\n"; // 固定値または引数化
-                log_file << "Temperature: 0\n";
-
-                log_file << "\n[Reasoning Content]\n";
-                log_file << thinking << "\n";
-
-                log_file << "\n[Final Answer]\n";
-                log_file << full_response << "\n"; // タグ付きの全文を出力するのが安全
-                log_file << "\n";
-            }
-
-            // マネージャーへの記録
-            if (choice != -1) {
-                responseManager.recordResponse(p_id, q_id, choice);
-            }
-
-            processed_count++;
-            // 進捗表示（任意）
-            // if (processed_count % 100 == 0) std::cout << "." << std::flush;
-        }
-
-        std::cout << "Done. (" << processed_count << " responses processed)" << std::endl;
-
-        // 7. 結果の出力 (CSV)
+        // 結果出力
         responseManager.printSummary();
         exportResultsByTemplate(responseManager, questions, template_name);
 
-        if (log_file.is_open()) {
-            log_file.close();
-        }
+        if (log_file.is_open()) log_file.close();
     }
 }
