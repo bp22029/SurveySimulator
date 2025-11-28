@@ -11,7 +11,7 @@ std::vector<Person> readSyntheticPopulation(const std::string& filename);
 std::vector<Question> readQuestions(const std::string& filename);
 std::string unquoteString(const std::string& input_str);
 std::vector<Person> readPopulationForTest(const std::string& filename);
-
+std::vector<Person> readPopulationFromMergedCSV(const std::string& filename);
 // Big Five性格特性のランダム生成
 void randomBigFive(Person& person);
 

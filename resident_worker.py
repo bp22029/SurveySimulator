@@ -1,10 +1,14 @@
 import os
 os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+os.environ["VLLM_ENABLE_V1_MULTIPROCESSING"] = "0"
 
 # --- 【対策1】 再現性のための環境変数（importより前に書くこと！） ---
 os.environ['VLLM_DETERMINISTIC_OPS'] = '1'
 os.environ['CUBLAS_WORKSPACE_CONFIG'] = ':4096:8'
 os.environ['PYTHONHASHSEED'] = '42'
+
+# os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
 
 import json
 import time
@@ -36,7 +40,8 @@ def main():
         seed=42,
         gpu_memory_utilization=0.9,
         max_model_len=4096,
-        disable_log_stats=True
+        disable_log_stats=True,
+        enforce_eager=True
     )
 
     # トークナイザー取得
@@ -46,7 +51,7 @@ def main():
     sampling_params = SamplingParams(
         temperature=0.0,
         top_p=1.0,
-        max_tokens=512,
+        max_tokens=1024,
         seed=42
     )
 

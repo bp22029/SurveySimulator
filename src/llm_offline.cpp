@@ -143,7 +143,8 @@ void sendRequestAndReceiveResponse(
             std::string thinking = extractThinkingLog(full_response);
             *log_file << "\n[Reasoning Content]\n" << thinking << "\n";
 
-            *log_file << "\n[Final Answer]\n" << full_response << "\n";
+            int answer = extractAnswerFromTags(full_response);
+            *log_file << "\n[Final Answer]\n" << answer << "\n";
             *log_file << "\n";
 
             // 頻繁なフラッシュは遅くなるので、適宜調整してください
