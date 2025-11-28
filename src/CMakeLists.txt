@@ -25,6 +25,8 @@ add_library(SurveySimulatorLib STATIC
         ../include/question.hpp
         ../include/individual_responses.hpp
         ../include/ThreadSafeQueue.hpp
+        llm_offline.cpp
+        ../include/llm_offline.hpp
 )
 
 # (2) メインの実行ファイル "SurveySimulator" を定義

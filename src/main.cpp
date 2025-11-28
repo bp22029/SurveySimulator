@@ -55,13 +55,15 @@ int main() {
 
     std::map<std::string, std::string> system_prompt_templates = {
         {"bigfive", readPromptTemplate(system_template_path_bigfive)},
-        // {"bfi2", readPromptTemplate(system_template_path_bfi2)},
-        // {"schwartz", readPromptTemplate(system_template_path_schwartz)},
-        // {"pvq", readPromptTemplate(system_template_path_pvq)},
-        // {"complex", readPromptTemplate(system_template_path_complex)}
+        {"bfi2", readPromptTemplate(system_template_path_bfi2)},
+        {"schwartz", readPromptTemplate(system_template_path_schwartz)},
+        {"pvq", readPromptTemplate(system_template_path_pvq)},
+        {"complex", readPromptTemplate(system_template_path_complex)}
     };
 
     std::string system_prompt_template = readPromptTemplate(system_template_path_bigfive);
+
+    std::cout << system_prompt_template << std::endl;
 
     // ユーザープロンプトのテンプレートの読み込み
     std::string user_template_path = "../../data/prompt_templates/user_prompt_template.txt";
@@ -84,10 +86,10 @@ int main() {
 
     // 4. シミュレーションの実行
     //std::string log_name = "experiment_simulation_log.txt";
-    //runSurveySimulation(population, questions, system_prompt_template,user_prompt_template, results, responseManager, &queryLLM, log_name);
+    //runSurveySimulation(population, questions, system_prompt_template,user_prompt_template, results, responseManager, &queryLLM);
     //runSurveySimulation_Parallel(population, questions, prompt_template, results, 64); // 64スレッドで実行
 
-    // runSurveySimulation_Resident(population,test_population, questions, system_prompt_template,user_prompt_template, responseManager);
+    //runSurveySimulation_Resident(population,test_population, questions, system_prompt_template,user_prompt_template, responseManager);
     //
     // responseManager.printSummary();
     // exportResultsToFiles(responseManager,population,questions,
@@ -95,7 +97,7 @@ int main() {
     //                      "../../data/merged_population_responses.csv");
 
     // テスト用シミュレーションの実行
-    runTestSurveySimulation(test_population, questions, system_prompt_templates, user_prompt_template);
+    //runTestSurveySimulation(test_population, questions, system_prompt_templates, user_prompt_template);
 
     //unsigned int num_threads = 16;
 
@@ -121,7 +123,22 @@ int main() {
     //     return 1;
     // }
     // CrossGenderTable cross_gender_table = buildCrossGenderTableFromCsv(merged_filename, questions);
-    // printCrossGenderTable(cross_gender_table);
+    // printCrossGenderTable(cross_gender_table);[
+
+
+
+
+    // 統合したcsvから人口データを読み込む
+    std::string merged_filename = "../../data/merged_population_responses.csv";
+    std::vector<Person> merged_population = readPopulationFromMergedCSV(merged_filename);
+    if (merged_population.empty()) {
+        return 1;
+    }
+    //プロンプトを生成して読み込みが正しくできているか確認
+    std::string generated_system_prompt = generatePrompt(system_prompt_template, merged_population[0], questions[0]);
+    std::string generated_user_prompt = generatePrompt(user_prompt_template, merged_population[0], questions[0]);
+    std::cout << "Generated System Prompt:\n" << generated_system_prompt << std::endl;
+    std::cout << "Generated User Prompt:\n" << generated_user_prompt << std::endl;
 
 
 

@@ -228,3 +228,49 @@ std::string unquoteString(const std::string& input_str) {
     // 上の条件に当てはまらない場合は、元の文字列をそのまま返す
     return input_str;
 }
+
+std::vector<Person> readPopulationFromMergedCSV(const std::string& filename) {
+    std::vector<Person> population;
+    std::ifstream file(filename);
+
+    if (!file.is_open()) {
+        std::cerr << "ファイルを開けません: " << filename << std::endl;
+        return population;
+    }
+    std::string line;
+    bool isFirstLine = true;
+    while (std::getline(file, line)) {
+        if (isFirstLine) {
+            isFirstLine = false;
+            continue;
+        }
+        std::vector<std::string> fields;
+        std::stringstream ss(line);
+        std::string field;
+        while (std::getline(ss, field, ',')) {
+            fields.push_back(field);
+        }
+        Person person;
+        person.person_id = std::stoi(fields[0]);
+        person.gender = fields[1];
+        person.prefecture_name = fields[2];
+        person.city_name = fields[3];
+        person.age = std::stoi(fields[4]);
+        person.industry_type = fields[5];
+        person.employment_type = fields[6];
+        person.company_size = fields[7];
+        person.family_type = fields[8];
+        person.role_household_type = fields[9];
+        person.total_income = fields[10].empty() ? 0 : std::stoi(fields[10]);
+        person.personality.neuroticism.score = std::stof(fields[11]);
+        person.personality.conscientiousness.score = std::stof(fields[12]);
+        person.personality.extraversion.score = std::stof(fields[13]);
+        person.personality.agreeableness.score = std::stof(fields[14]);
+        person.personality.openness.score = std::stof(fields[15]);
+
+        population.push_back(person);
+    }
+
+    file.close();
+    return population;
+}

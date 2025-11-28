@@ -172,8 +172,7 @@ void runSurveySimulation(const std::vector<Person>& population,
                          const std::string& user_prompt_template,
                          std::vector<SurveyResult>& results, // 今回は使用していないようですが維持
                          IndividualResponseManager& responseManager,
-                         LlmQueryFunc query_func,
-                         const std::string& log_filename) { // ★追加: ログファイル名を受け取る
+                         LlmQueryFunc query_func) { // ★追加: ログファイル名を受け取る
 
     int total_simulations = population.size() * questions.size();
     int current_count = 0;
@@ -183,6 +182,17 @@ void runSurveySimulation(const std::vector<Person>& population,
     // -------------------------------------------------------
     // ★追加: ログファイルの作成・オープン
     // -------------------------------------------------------
+
+
+    time_t now = time(0);
+    tm* ltm = localtime(&now);
+    char timestamp[20];
+    strftime(timestamp, sizeof(timestamp), "%Y%m%d_%H%M%S", ltm);
+    std::string log_dir_path = "../../log/";
+
+    std::string log_filename = log_dir_path + "log_" + "experiment_server_" + timestamp + ".txt";
+
+
     std::ofstream log_file(log_filename);
     if (!log_file.is_open()) {
         std::cerr << "Error: Could not open log file " << log_filename << std::endl;
@@ -206,7 +216,8 @@ void runSurveySimulation(const std::vector<Person>& population,
             params.system_prompt = generated_system_prompt;
 
             // ★変更: 戻り値を string ではなく LLMResponse で受け取る
-            LLMResponse result = query_func(generated_user_prompt, "127.0.0.1", 8000, params);
+            //LLMResponse result = query_func(generated_user_prompt, "127.0.0.1", 8000, params);
+            LLMResponse result = query_func(generated_user_prompt, "192.168.3.16", 1234, params);
 
             std::cout << result.content << std::endl; // コンソールには回答のみ表示
 
@@ -326,7 +337,9 @@ void runTestSurveySimulation(const std::vector<Person>& population,
                 params.system_prompt = generated_system_prompt;
 
                 // LLMへの問い合わせ (戻り値が LLMResponse になりました)
-                LLMResponse result = queryLLM(generated_user_prompt, "127.0.0.1", 8000, params);
+                //LLMResponse result = queryLLM(generated_user_prompt, "127.0.0.1", 8000, params);
+
+                LLMResponse result = queryLLM(generated_user_prompt, "192.168.3.16", 1234, params);
 
                 std::cout << "Answer: " << result.content << std::endl; // コンソールには回答のみ表示
 
@@ -618,74 +631,77 @@ void runTestSurveySimulation_Resident(
     int total_tasks_per_template = population.size() * questions.size();
 
 
-    IndividualResponseManager responseManager_for_warmup;
-    std::string system_prompt_template_warmup = system_prompt_templates.begin()->second;
-
-    std::cout << "[C++] Warming up..." << std::endl;
-    for (const auto& person : population) {
-        std::cout << "[C++] Warming up with Agent ID: " << person.person_id << "..." << std::endl;
-        sendRequestAndReceiveResponse(
-            person,
-            questions,
-            system_prompt_template_warmup,
-            user_prompt_template,
-            responseManager_for_warmup,
-            nullptr // ログファイルポインタは渡さない
-        );
-    }
+    // IndividualResponseManager responseManager_for_warmup;
+    // std::string system_prompt_template_warmup = system_prompt_templates.begin()->second;
+    //
+    // std::cout << "[C++] Warming up..." << std::endl;
+    // for (const auto& person : population) {
+    //     std::cout << "[C++] Warming up with Agent ID: " << person.person_id << "..." << std::endl;
+    //     sendRequestAndReceiveResponse(
+    //         person,
+    //         questions,
+    //         system_prompt_template_warmup,
+    //         user_prompt_template,
+    //         responseManager_for_warmup,
+    //         nullptr // ログファイルポインタは渡さない
+    //     );
+    // }
 
     // --- System Prompt Template のループ ---
     for (const auto& [template_name, system_prompt_template] : system_prompt_templates) {
-        std::cout << "\n=== [Resident] Using Template: " << template_name << " ===" << std::endl;
+        int i;
+        for (i = 0; i < 3; i++) {
+            std::cout << "\n=== [Resident] Using Template: " << template_name << " ===" << std::endl;
 
-        // ログファイルの準備 (ファイル名は適宜設定)
-        time_t now = time(0);
-        tm* ltm = localtime(&now);
-        char timestamp[20];
-        strftime(timestamp, sizeof(timestamp), "%Y%m%d_%H%M%S", ltm);
-        // ... (ログファイルオープンのコード) ...
-        std::string log_filename = "../../log/log_" + template_name + "_" + timestamp + ".txt"; // 例
-        std::ofstream log_file(log_filename);
+            // ログファイルの準備 (ファイル名は適宜設定)
+            time_t now = time(0);
+            tm* ltm = localtime(&now);
+            char timestamp[20];
+            strftime(timestamp, sizeof(timestamp), "%Y%m%d_%H%M%S", ltm);
+            // ... (ログファイルオープンのコード) ...
+            std::string log_filename = "../../log/log_" + template_name + "_" + timestamp + ".txt"; // 例
+            std::ofstream log_file(log_filename);
 
-        IndividualResponseManager responseManager;
-
-
-        // ---------------------------------------------------------
-        // ★ここが変更点: 全員まとめてではなく、一人ずつループして関数を呼ぶ
-        // ---------------------------------------------------------
-
-        // まずウォームアップ (最初の1人は捨てデータとして実行する場合)
-        // ※Python側でヘビーウォームアップ済みなら、ここはスキップしてもOKですが
-        //  念を入れるなら population[0] を一度空回しすると確実です。
+            IndividualResponseManager responseManager;
 
 
-        //sendRequestAndReceiveResponse(population[0], questions, system_prompt_template, user_prompt_template, responseManager, nullptr);
-        // ウォームアップ結果は responseManager に入ってしまうので、必要ならクリアするか、
-        // 専用のダミーPersonを用意して投げると良いです。
+            // ---------------------------------------------------------
+            // ★ここが変更点: 全員まとめてではなく、一人ずつループして関数を呼ぶ
+            // ---------------------------------------------------------
+
+            // まずウォームアップ (最初の1人は捨てデータとして実行する場合)
+            // ※Python側でヘビーウォームアップ済みなら、ここはスキップしてもOKですが
+            //  念を入れるなら population[0] を一度空回しすると確実です。
 
 
-        int count = 0;
-        for (const auto& person : population) {
-            count++;
-            std::cout << "[C++] Processing Agent " << count << "/" << population.size()
-                      << " (ID: " << person.person_id << ")..." << std::endl;
+            //sendRequestAndReceiveResponse(population[0], questions, system_prompt_template, user_prompt_template, responseManager, nullptr);
+            // ウォームアップ結果は responseManager に入ってしまうので、必要ならクリアするか、
+            // 専用のダミーPersonを用意して投げると良いです。
 
-            // ★ここで「1人分(52問)」を処理する関数を呼ぶ
-            //   この関数の中で ファイル書き込み -> 待機 -> 読み込み が完結します
-            sendRequestAndReceiveResponse(
-                person,
-                questions,
-                system_prompt_template,
-                user_prompt_template,
-                responseManager,
-                &log_file // ログファイルポインタを渡す
-            );
+
+            int count = 0;
+            for (const auto& person : population) {
+                count++;
+                std::cout << "[C++] Processing Agent " << count << "/" << population.size()
+                          << " (ID: " << person.person_id << ")..." << std::endl;
+
+                // ★ここで「1人分(52問)」を処理する関数を呼ぶ
+                //   この関数の中で ファイル書き込み -> 待機 -> 読み込み が完結します
+                sendRequestAndReceiveResponse(
+                    person,
+                    questions,
+                    system_prompt_template,
+                    user_prompt_template,
+                    responseManager,
+                    &log_file // ログファイルポインタを渡す
+                );
+            }
+
+            // 結果出力
+            responseManager.printSummary();
+            exportResultsByTemplate(responseManager, questions, template_name);
+
+            if (log_file.is_open()) log_file.close();
         }
-
-        // 結果出力
-        responseManager.printSummary();
-        exportResultsByTemplate(responseManager, questions, template_name);
-
-        if (log_file.is_open()) log_file.close();
     }
 }

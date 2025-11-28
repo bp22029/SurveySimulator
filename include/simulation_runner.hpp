@@ -19,8 +19,7 @@ void runSurveySimulation(const std::vector<Person>& population,
                         const std::string& user_prompt_template,
                         std::vector<SurveyResult>& results,
                         IndividualResponseManager& responseManager,
-                        LlmQueryFunc query_func,
-                        const std::string& log_filename);
+                        LlmQueryFunc query_func);
 
 void runSurveySimulation_Parallel(const std::vector<Person>& population,
                                  const std::vector<Question>& questions,
