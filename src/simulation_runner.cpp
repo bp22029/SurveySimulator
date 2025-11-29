@@ -335,6 +335,7 @@ void runTestSurveySimulation(const std::vector<Person>& population,
 
                 // パラメータ設定
                 params.system_prompt = generated_system_prompt;
+                params.seed = generateSeed(person.person_id, questions[i].id);
 
                 // LLMへの問い合わせ (戻り値が LLMResponse になりました)
                 //LLMResponse result = queryLLM(generated_user_prompt, "127.0.0.1", 8000, params);
@@ -367,8 +368,8 @@ void runTestSurveySimulation(const std::vector<Person>& population,
 
                 // 以前の処理の継続
                 if (result.success) {
-                    // int choice_number = parseLlmAnswer(result.content);
-                    int choice_number = extractAnswerFromTags(result.content);
+                    int choice_number = parseLlmAnswer(result.content);
+                    //int choice_number = extractAnswerFromTags(result.content);
                     if (choice_number != -1) {
                         responseManager.recordResponse(person.person_id, questions[i].id, choice_number);
                     }
