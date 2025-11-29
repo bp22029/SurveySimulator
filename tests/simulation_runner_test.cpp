@@ -58,8 +58,7 @@ TEST(SimulationRunnerTest, RunSimulationWithMock) {
         user_tpl,
         results,
         manager,           // ★ 検証用マネージャー
-        &MockQueryFunction, // ★ 偽物の関数（型が合うようになりました）
-        "test_dummy_log.txt" // ★追加: テスト用のログファイル名
+        &MockQueryFunction // ★ 偽物の関数（型が合うようになりました）
     );
 
     // 3. 検証 (Assert)
