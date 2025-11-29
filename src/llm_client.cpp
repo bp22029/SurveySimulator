@@ -5,6 +5,8 @@
 #include "../include/llm_client.hpp"
 #include <fstream>
 #include <sstream>
+#include <string>
+#include <map>
 
 #include "httplib.h"
 #include "nlohmann/json.hpp"
@@ -24,6 +26,20 @@ using json = nlohmann::json;
  * @return std::string LLMからの応答テキスト。エラーの場合は"ERROR"を返す。
  */
 // 戻り値を格納する構造体を定義
+
+int generateSeed(const int person_id, const std::string question_id) {
+    // person_idとquestion_idを組み合わせて一意のシードを生成
+    int seed;
+    if (person_id > 1000) {
+        seed = (person_id % 1000) * 100 + get_question_number(question_id);
+    }else {
+        seed = person_id * 100 + get_question_number(question_id);
+    }
+
+    return seed;
+}
+
+
 
 // queryLLMの戻り値を std::string から LLMResponse に変更
 LLMResponse queryLLM(const std::string& prompt, const std::string& host, int port, const LLMParams& params) {
@@ -179,3 +195,69 @@ LLMResponse queryLLM(const std::string& prompt, const std::string& host, int por
 //     }
 //
 // }
+
+
+int get_question_number(const std::string& question_id) {
+    // 静的なマップを定義して、初回呼び出し時にのみ初期化します
+    static const std::map<std::string, int> q_map = {
+        {"dq2_1", 1},
+        {"dq2_2", 2},
+        {"dq2_3", 3},
+        {"dq2_4", 4},
+        {"dq2_5", 5},
+        {"dq2_6", 6},
+        {"dq2_7", 7},
+        {"dq2_8", 8},
+        {"dq2_9", 9},
+        {"dq2_10", 10},
+        {"dq3_1", 11},
+        {"dq3_2", 12},
+        {"dq3_3", 13},
+        {"dq4_1", 14},
+        {"dq4_2", 15},
+        {"dq4_3", 16},
+        {"dq4_4", 17},
+        {"dq5_1", 18},
+        {"dq5_2", 19},
+        {"dq5_3", 20},
+        {"dq5_4", 21},
+        {"dq5_5", 22},
+        {"dq5_6", 23},
+        {"dq6_1", 24},
+        {"dq6_2", 25},
+        {"dq6_3", 26},
+        {"dq7_1", 27},
+        {"dq7_2", 28},
+        {"dq7_3", 29},
+        {"dq7_4", 30},
+        {"dq8_1", 31},
+        {"dq8_2", 32},
+        {"dq8_3", 33},
+        {"dq8_4", 34},
+        {"dq8_5", 35},
+        {"dq9_1", 36},
+        {"dq9_2", 37},
+        {"dq9_3", 38},
+        {"dq9_4", 39},
+        {"dq10_1", 40},
+        {"dq10_2", 41},
+        {"dq16", 42},
+        {"dq22_1", 43},
+        {"dq22_2", 44},
+        {"dq22_3", 45},
+        {"dq22_4", 46},
+        {"dq22_5", 47},
+        {"dq22_6", 48},
+        {"dq23_1", 49},
+        {"dq23_2", 50},
+        {"dq23_3", 51},
+        {"dq23_4", 52}
+    };
+
+    auto it = q_map.find(question_id);
+    if (it != q_map.end()) {
+        return it->second;
+    } else {
+        return -1; // 見つからない場合は-1を返す（または例外を投げるなど）
+    }
+}

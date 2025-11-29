@@ -63,8 +63,6 @@ int main() {
 
     std::string system_prompt_template = readPromptTemplate(system_template_path_bigfive);
 
-    std::cout << system_prompt_template << std::endl;
-
     // ユーザープロンプトのテンプレートの読み込み
     std::string user_template_path = "../../data/prompt_templates/user_prompt_template.txt";
     std::string user_prompt_template = readPromptTemplate(user_template_path);
@@ -97,7 +95,7 @@ int main() {
     //                      "../../data/merged_population_responses.csv");
 
     // テスト用シミュレーションの実行
-    //runTestSurveySimulation(test_population, questions, system_prompt_templates, user_prompt_template);
+    runTestSurveySimulation(test_population, questions, system_prompt_templates, user_prompt_template);
 
     //unsigned int num_threads = 16;
 
@@ -129,16 +127,12 @@ int main() {
 
 
     // 統合したcsvから人口データを読み込む
-    std::string merged_filename = "../../data/merged_population_responses.csv";
-    std::vector<Person> merged_population = readPopulationFromMergedCSV(merged_filename);
-    if (merged_population.empty()) {
-        return 1;
-    }
-    //プロンプトを生成して読み込みが正しくできているか確認
-    std::string generated_system_prompt = generatePrompt(system_prompt_template, merged_population[0], questions[0]);
-    std::string generated_user_prompt = generatePrompt(user_prompt_template, merged_population[0], questions[0]);
-    std::cout << "Generated System Prompt:\n" << generated_system_prompt << std::endl;
-    std::cout << "Generated User Prompt:\n" << generated_user_prompt << std::endl;
+    // std::string merged_filename = "../../data/merged_population_responses.csv";
+    // std::vector<Person> merged_population = readPopulationFromMergedCSV(merged_filename);
+    // if (merged_population.empty()) {
+    //     return 1;
+    // }
+
 
 
 

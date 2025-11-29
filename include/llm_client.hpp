@@ -15,10 +15,10 @@ using json = nlohmann::json;
 
 // LLMのパラメータを管理する構造体
 struct LLMParams {
-    std::string model = "openai/gpt-oss-20b";
+    std::string model = "openai/gpt-oss-120b";
     std::string system_prompt;
     double temperature = 0.0;
-    int seed = 42;
+    int seed;
     bool stream = false;
     int max_tokens = 2048;
     double repetition_penalty = 1.0;
@@ -68,5 +68,9 @@ using LlmQueryFunc = std::function<LLMResponse(const std::string&, const std::st
 LLMResponse queryLLM(const std::string& prompt, const std::string& host, int port, const LLMParams& params);
 
 std::string queryLLMForPersonality(const std::string& prompt, const std::string& host, int port, const LLMParams& params);
+
+int get_question_number(const std::string& question_id);
+
+int generateSeed(const int person_id, const std::string question_id);
 
 #endif
