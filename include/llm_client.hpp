@@ -15,7 +15,7 @@ using json = nlohmann::json;
 
 // LLMのパラメータを管理する構造体
 struct LLMParams {
-    std::string model = "openai/gpt-oss-120b";
+    std::string model = "openai/gpt-oss-20b";
     std::string system_prompt;
     double temperature = 0.0;
     int seed;
