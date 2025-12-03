@@ -13,6 +13,10 @@
 #include "simulation_runner.hpp"
 #include "individual_response_manager.hpp"
 #include "cross_table_generator.hpp"
+#include "csv_comparer.hpp"
+#include "globals.hpp"
+#include <time.h>
+
 
 // nlohmann/jsonを使いやすくするために名前空間を指定
 using json = nlohmann::json;
@@ -52,15 +56,16 @@ int main() {
     //複合型
     std::string system_template_path_complex = "../../data/prompt_templates/prompt_template_complex.txt";
 
-
+    //システムプロンプトのテンプレート群
     std::map<std::string, std::string> system_prompt_templates = {
         {"bigfive", readPromptTemplate(system_template_path_bigfive)},
         {"bfi2", readPromptTemplate(system_template_path_bfi2)},
         {"schwartz", readPromptTemplate(system_template_path_schwartz)},
         {"pvq", readPromptTemplate(system_template_path_pvq)},
-        {"complex", readPromptTemplate(system_template_path_complex)}
+       // {"complex", readPromptTemplate(system_template_path_complex)}
     };
 
+    //仮の一つのテンプレートを読み込む　本番実験用
     std::string system_prompt_template = readPromptTemplate(system_template_path_bigfive);
 
     // ユーザープロンプトのテンプレートの読み込み
@@ -71,31 +76,27 @@ int main() {
     std::vector<SurveyResult> results;
     initializeSurveyResults(results,questions);
 
-    // std::string generated_system_prompt = generatePrompt(system_prompt_template, test_population[0], questions[0]);
-    // std::string generated_user_prompt = generatePrompt(user_prompt_template, test_population[0], questions[0]);
-    // std::cout << "Generated System Prompt:\n" << generated_system_prompt << std::endl;
-    // std::cout << "Generated User Prompt:\n" << generated_user_prompt << std::endl;
-
-
     IndividualResponseManager responseManager;
 
-    //vLLMウォームアップ
-    //runTestSurveySimulation_Resident(test_population,questions,system_prompt_templates,user_prompt_template);
+    //検証用のシミュレーション　オフライン
+    runTestSurveySimulation_Resident(test_population,questions,system_prompt_templates,user_prompt_template);
 
-    // 4. シミュレーションの実行
+    //シミュレーションの実行
     //std::string log_name = "experiment_simulation_log.txt";
     //runSurveySimulation(population, questions, system_prompt_template,user_prompt_template, results, responseManager, &queryLLM);
     //runSurveySimulation_Parallel(population, questions, prompt_template, results, 64); // 64スレッドで実行
 
+    //本番用実験　オフライン推論
     //runSurveySimulation_Resident(population,test_population, questions, system_prompt_template,user_prompt_template, responseManager);
-    //
-    // responseManager.printSummary();
-    // exportResultsToFiles(responseManager,population,questions,
-    //                      "../../results/individual_responses.csv",
-    //                      "../../data/merged_population_responses.csv");
+
+     // responseManager.printSummary();
+     // exportResultsToFiles(responseManager,population,questions,
+     //                      "../../results/individual_responses.csv",
+     //                      "../../data/merged_population_responses.csv");
+
 
     // テスト用シミュレーションの実行
-    runTestSurveySimulation(test_population, questions, system_prompt_templates, user_prompt_template);
+    //runTestSurveySimulation(test_population, questions, system_prompt_templates, user_prompt_template);
 
     //unsigned int num_threads = 16;
 
@@ -107,11 +108,6 @@ int main() {
     //     num_threads
     // );
 
-    // runTestSurveySimulation_Resident(test_population,questions,system_prompt_templates,user_prompt_template);
-
-    // exportResultsToFiles(responseManager,population,questions,
-    //                      "../../results/individual_responses.csv",
-    //                      "../../data/merged_population_responses.csv");
 
     // // 5．csvからクロス集計を行う
     // std::string merged_filename = "../data/merged_population_responses.csv";
@@ -132,6 +128,8 @@ int main() {
     // if (merged_population.empty()) {
     //     return 1;
     // }
+
+
 
 
 
