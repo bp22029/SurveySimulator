@@ -65,8 +65,8 @@ int main() {
        // {"complex", readPromptTemplate(system_template_path_complex)}
     };
 
-    //仮の一つのテンプレートを読み込む　本番実験用
-    std::string system_prompt_template = readPromptTemplate(system_template_path_bigfive);
+    //仮の一つのテンプレートを読み込む　本番実験用(BFI-2を採用)
+    std::string system_prompt_template = readPromptTemplate(system_template_path_bfi2);
 
     // ユーザープロンプトのテンプレートの読み込み
     std::string user_template_path = "../../data/prompt_templates/user_prompt_template.txt";
