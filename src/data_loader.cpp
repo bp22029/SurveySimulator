@@ -25,6 +25,54 @@ void randomBigFive(Person& person) {
     person.personality.openness.score = dis(gen);
 }
 
+void randomBFI2(Person& person) {
+    // static std::random_device rd;
+    // static std::mt19937 gen(rd());
+
+    static std::mt19937 gen(42);
+
+    static std::uniform_real_distribution<float> dis(0.0f, 1.0f);
+
+    // 各ファセットのスコアもランダムに生成
+    person.personality.neuroticism.anxiety = dis(gen);
+    person.personality.neuroticism.depression = dis(gen);
+    person.personality.neuroticism.emotional_volatility = dis(gen);
+
+    person.personality.conscientiousness.organization = dis(gen);
+    person.personality.conscientiousness.productivity = dis(gen);
+    person.personality.conscientiousness.responsibility = dis(gen);
+
+    person.personality.extraversion.sociability = dis(gen);
+    person.personality.extraversion.assertiveness = dis(gen);
+    person.personality.extraversion.energy_level = dis(gen);
+
+    person.personality.agreeableness.compassion = dis(gen);
+    person.personality.agreeableness.respectfulness = dis(gen);
+    person.personality.agreeableness.trust = dis(gen);
+
+    person.personality.openness.intellectual_curiosity = dis(gen);
+    person.personality.openness.aesthetic_sensitivity = dis(gen);
+    person.personality.openness.creative_imagination = dis(gen);
+
+
+    // 各ファセット尺度のスコアを平均してドメイン尺度を設定
+    person.personality.neuroticism.score = (person.personality.neuroticism.anxiety +
+                                            person.personality.neuroticism.depression +
+                                            person.personality.neuroticism.emotional_volatility) / 3.0f;
+    person.personality.conscientiousness.score = (person.personality.conscientiousness.organization +
+                                                  person.personality.conscientiousness.productivity +
+                                                  person.personality.conscientiousness.responsibility) / 3.0f;
+    person.personality.extraversion.score = (person.personality.extraversion.sociability +
+                                             person.personality.extraversion.assertiveness +
+                                             person.personality.extraversion.energy_level) / 3.0f;
+    person.personality.agreeableness.score = (person.personality.agreeableness.compassion +
+                                              person.personality.agreeableness.respectfulness +
+                                              person.personality.agreeableness.trust) / 3.0f;
+    person.personality.openness.score = (person.personality.openness.intellectual_curiosity +
+                                         person.personality.openness.aesthetic_sensitivity +
+                                         person.personality.openness.creative_imagination) / 3.0f;
+}
+
 
 std::vector<Person> readSyntheticPopulation(const std::string& filename) {
     std::vector<Person> population;
@@ -75,7 +123,8 @@ std::vector<Person> readSyntheticPopulation(const std::string& filename) {
             } else {
                 person.total_income = 0;
             }
-            randomBigFive(person);
+            //randomBigFive(person);
+            randomBFI2(person);
             population.push_back(person);
         }
     }
