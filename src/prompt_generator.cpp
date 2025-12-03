@@ -33,15 +33,80 @@ std::string generatePrompt(const std::string& template_str, const Person& person
     std::string prompt = template_str;
     char buffer[32];
 
+    // replaceAll(prompt, "{性別}", person.gender);
+    // replaceAll(prompt, "{住所}", person.prefecture_name+person.city_name);
+    // replaceAll(prompt, "{年齢}", std::to_string(person.age));
+    // replaceAll(prompt, "{職業分類}", person.industry_type);
+    // replaceAll(prompt, "{雇用形態}", person.employment_type);
+    // replaceAll(prompt,"{企業規模}", person.company_size);
+    // replaceAll(prompt, "{世帯構成}", person.family_type);
+    // replaceAll(prompt, "{世帯での役割}", person.role_household_type);
+    // replaceAll(prompt, "{月収}", std::to_string(person.total_income));
+
+    std::string industry_display = person.industry_type;
+    std::string role_display = person.role_household_type;
+    std::string income_display = std::to_string(person.total_income);
+    std::string family_display = person.family_type; // 世帯構成も微調整できるように変数化
+
+    // --- 2. 「子供」という表記の書き換えロジック（全年齢共通） ---
+    // データ上の「子供」を、年齢に合わせて誤解のない日本語に変換する
+    if (role_display.find("子供") != std::string::npos) {
+        if (person.age >= 18) {
+            // 成人の場合
+            if (person.gender == "男性") {
+                role_display = "実家暮らしの息子（両親と同居）";
+            } else if (person.gender == "女性") {
+                role_display = "実家暮らしの娘（両親と同居）";
+            } else {
+                role_display = "実家暮らしの子供（成人・両親と同居）";
+            }
+        } else {
+            // 未成年の場合
+            role_display = "親と同居している子供";
+        }
+
+        // 補足: 世帯構成の「夫婦と子供」という表記も、48歳などの場合は違和感があるので補足する
+        if (person.age >= 30) {
+            family_display += "（高齢の親と同居）";
+        }
+    }
+
+    // --- 3. 学生（24歳以下かつ無職）の判定ロジック ---
+    bool is_unemployed = person.industry_type.empty() || person.industry_type == "";
+    if (person.age <= 24 && is_unemployed) {
+        industry_display = "学生（親の扶養下）";
+        if (person.total_income == 0) {
+            income_display = "0円（学費・生活費は親負担のため経済的不安なし）";
+        }
+    }else if (is_unemployed) { // age > 24 は自明なので else if でOK
+
+        // 空白のままだと不安定なので「無職」と明記する
+        industry_display = "無職";
+
+        // 0円の理由を補足（これが重要）
+        if (person.total_income == 0) {
+            // 親と同居しているなら、親の年金等で暮らしている可能性が高い
+            if (role_display.find("同居") != std::string::npos) {
+                income_display = "0円（家族の収入・年金に依存）";
+            } else {
+                // 一人暮らしで0円は貯蓄切り崩しか生活保護
+                income_display = "0円（貯蓄切り崩し、または支援受給）";
+            }
+        }
+    }
+
+    // --- 4. プロンプトへの置換実行 ---
     replaceAll(prompt, "{性別}", person.gender);
-    replaceAll(prompt, "{住所}", person.prefecture_name+person.city_name);
+    replaceAll(prompt, "{住所}", person.prefecture_name + person.city_name);
     replaceAll(prompt, "{年齢}", std::to_string(person.age));
-    replaceAll(prompt, "{職業分類}", person.industry_type);
+    replaceAll(prompt, "{職業分類}", industry_display);
     replaceAll(prompt, "{雇用形態}", person.employment_type);
-    replaceAll(prompt,"{企業規模}", person.company_size);
-    replaceAll(prompt, "{世帯構成}", person.family_type);
-    replaceAll(prompt, "{世帯での役割}", person.role_household_type);
-    replaceAll(prompt, "{月収}", std::to_string(person.total_income));
+    replaceAll(prompt, "{企業規模}", person.company_size);
+
+    // ★ここで加工済みの変数を使用
+    replaceAll(prompt, "{世帯構成}", family_display);
+    replaceAll(prompt, "{世帯での役割}", role_display);
+    replaceAll(prompt, "{月収}", income_display);
 
     snprintf(buffer, sizeof(buffer), "%.2f", person.personality.neuroticism.score);
     //sprintf(buffer, "%.2f", person.personality.neuroticism);

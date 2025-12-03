@@ -137,7 +137,15 @@ void sendRequestAndReceiveResponse(
             *log_file << "--------------------------------------------------\n";
             *log_file << "Agent ID: " << p_id << " | Question ID: " << q_id << "\n";
             // モデル名などは固定か引数で渡す
-            *log_file << "Model: google/gemma-3-12b-it | Seed: 42 | Temp: 0\n";
+
+            //*log_file << "Model: google/gemma-3-12b-it | Seed: 42 | Temp: 0\n";
+            // *log_file << "Model: opneai/gpt-oss-20b | Seed: 42 | Temp: 0\n";
+            //*log_file << "Model: Qwen/Qwen3-14B | Seed: 42 | Temp: 0\n";
+            //*log_file << "microsoft/Phi-4-reasoning-plus| Seed: 42 | Temp: 0\n";
+            // *log_file << "deepseek-ai/DeepSeek-R1-Distill-Qwen-14B | Seed: 42 | Temp: 0\n";
+            *log_file << "Model: google/gemma-3-27b-it | Seed: 42 | Temp: 0\n";
+            //*log_file << "Model: Qwen/Qwen3-32B | Seed: 42 | Temp: 0\n";
+            //*log_file << "Model: mistralai/Mistral-Small-24B-Instruct-2501| Seed: 42 | Temp: 0\n";
 
             // 思考部分の抽出
             std::string thinking = extractThinkingLog(full_response);

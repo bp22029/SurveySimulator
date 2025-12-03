@@ -10,6 +10,8 @@ add_library(SurveySimulatorLib STATIC
         individual_response_manager.cpp
         thread_worker.cpp
         cross_table_generator.cpp
+        llm_offline.cpp
+        csv_comparer.cpp
 
         # ヘッダファイルも追加 (includeディレクトリへのパスは (3) で指定)
         ../include/data_loader.hpp
@@ -25,8 +27,9 @@ add_library(SurveySimulatorLib STATIC
         ../include/question.hpp
         ../include/individual_responses.hpp
         ../include/ThreadSafeQueue.hpp
-        llm_offline.cpp
         ../include/llm_offline.hpp
+        ../include/csv_comparer.hpp
+        ../include/globals.hpp
 )
 
 # (2) メインの実行ファイル "SurveySimulator" を定義

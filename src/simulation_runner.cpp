@@ -20,6 +20,7 @@ namespace fs = std::filesystem;
 #include <time.h>
 #include "nlohmann/json.hpp"
 #include "../include/llm_offline.hpp"
+#include "globals.hpp"
 
 using json = nlohmann::json;
 
@@ -390,22 +391,6 @@ void runTestSurveySimulation(const std::vector<Person>& population,
     }
 }
 
-void exportResultsByTemplate(const IndividualResponseManager& responseManager,
-                           const std::vector<Question>& questions,
-                           const std::string& template_name) {
-    std::vector<std::string> question_ids;
-    for (const auto& q : questions) {
-        question_ids.push_back(q.id);
-    }
-
-    time_t now = time(0);
-    tm* ltm = localtime(&now);
-    char timestamp[20];
-    strftime(timestamp, sizeof(timestamp), "%Y%m%d_%H%M%S", ltm);
-    std::string filename = "../../results/for_test_individual_responses_" + template_name +"_"+ timestamp +  ".csv";
-    responseManager.exportToCSV(filename, question_ids);
-    responseManager.printSummary();
-}
 
 void runTestSurveySimulation_Parallel(
     const std::vector<Person>& population,
@@ -557,20 +542,20 @@ void runSurveySimulation_Resident(
         fs::create_directories(BRIDGE_DIR);
     }
 
-    IndividualResponseManager responseManager_for_warmup;
-
-    std::cout << "[C++] Warming up..." << std::endl;
-    for (const auto& person : test_population) {
-        std::cout << "[C++] Warming up with Agent ID: " << person.person_id << "..." << std::endl;
-        sendRequestAndReceiveResponse(
-            person,
-            questions,
-            system_prompt_template,
-            user_prompt_template,
-            responseManager_for_warmup,
-            nullptr // ログファイルポインタは渡さない
-        );
-    }
+    // IndividualResponseManager responseManager_for_warmup;
+    //
+    // std::cout << "[C++] Warming up..." << std::endl;
+    // for (const auto& person : test_population) {
+    //     std::cout << "[C++] Warming up with Agent ID: " << person.person_id << "..." << std::endl;
+    //     sendRequestAndReceiveResponse(
+    //         person,
+    //         questions,
+    //         system_prompt_template,
+    //         user_prompt_template,
+    //         responseManager_for_warmup,
+    //         nullptr // ログファイルポインタは渡さない
+    //     );
+    // }
 
     // ログファイルの準備 (ファイル名は適宜設定)
     time_t now = time(0);
@@ -651,7 +636,7 @@ void runTestSurveySimulation_Resident(
     // --- System Prompt Template のループ ---
     for (const auto& [template_name, system_prompt_template] : system_prompt_templates) {
         int i;
-        for (i = 0; i < 3; i++) {
+        for (i = 0; i < 1; i++) {
             std::cout << "\n=== [Resident] Using Template: " << template_name << " ===" << std::endl;
 
             // ログファイルの準備 (ファイル名は適宜設定)
@@ -705,4 +690,30 @@ void runTestSurveySimulation_Resident(
             if (log_file.is_open()) log_file.close();
         }
     }
+}
+
+void exportResultsByTemplate(const IndividualResponseManager& responseManager,
+                           const std::vector<Question>& questions,
+                           const std::string& template_name) {
+    std::vector<std::string> question_ids;
+    for (const auto& q : questions) {
+        question_ids.push_back(q.id);
+    }
+    std::string count = std::to_string(MyGlobals::g_counter);
+
+    time_t now = time(0);
+    tm* ltm = localtime(&now);
+    char timestamp[20];
+    strftime(timestamp, sizeof(timestamp), "%Y%m%d_%H%M%S", ltm);
+    //std::string filename = "../../results/for_test_individual_responses_" + template_name +"_"+ timestamp + "_gemma3.csv";
+    std::string filename = "../../results/for_test_individual_responses_" + template_name +"_"+ timestamp + "_gemma3_27B.csv";
+    //std::string filename = "../../results/for_test_individual_responses_" + template_name +"_"+ timestamp + "_qwen3_32B.csv";
+    //std::string filename = "../../results/for_test_individual_responses_" + template_name +"_"+ timestamp + "_phi4-reasoning-plus.csv";
+    // std::string filename = "../../results/for_test_individual_responses_" + template_name +"_"+ timestamp + "_deepseek.csv";
+    //std::string filename = "../../results/for_test_individual_responses_" + template_name +"_"+ timestamp + "_Mistral_24B.csv";
+
+    //std::string filename = "../../results/for_test_individual_responses_" + template_name +"_"+ timestamp + "_gpt-oss_" + count +  ".csv";
+    MyGlobals::g_counter += 1;
+    responseManager.exportToCSV(filename, question_ids);
+    responseManager.printSummary();
 }
