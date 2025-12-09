@@ -37,7 +37,7 @@ def main():
         # model="google/gemma-3-12b-it",
         # model="openai/gpt-oss-20b",
         # model = "Qwen/Qwen3-14B",
-        model = "microsoft/Phi-4-reasoning-plus",
+        model = "microsoft/phi-4",
         # model ="deepseek-ai/DeepSeek-R1-Distill-Qwen-14B",
         # model = "google/gemma-3-27b-it",
         tensor_parallel_size=1,

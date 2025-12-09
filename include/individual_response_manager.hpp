@@ -17,10 +17,14 @@ public:
     IndividualResponse getPersonResponses(int person_id) const;
     void exportToCSV(const std::string& filename, const std::vector<std::string>& question_ids) const;
     void printSummary() const;
-    void exportMergedPopulationCSV(const std::string& filename,
+    void exportMergedPopulationCSV_BigFive(const std::string& filename,
                                    const std::vector<Person>& population,
                                    const std::vector<std::string>& question_ids) const;
     const IndividualResponse* findPersonResponses(int person_id) const;
+    void exportMergedPopulationCSV_BFI2(const std::string& filename,
+                                    const std::vector<Person>& population,
+                                    const std::vector<std::string>& question_ids) const ;
+    const std::map<int, IndividualResponse>& getAllPersonResponses() const;
 };
 
 #endif // INDIVIDUAL_RESPONSE_MANAGER_HPP

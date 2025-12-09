@@ -48,8 +48,8 @@ def compare_csv_files(file_path1, file_path2):
 # ==========================================
 # 設定: ここに2つのCSVファイルのパスを指定してください
 # ==========================================
-csv_path_A = 'results/for_test_individual_responses_pvq_20251202_192836_phi4.csv'  # 1つ目のファイルパス
-csv_path_B = 'results/for_test_individual_responses_pvq_20251202_193541_phi4.csv'  # 2つ目のファイルパス
+csv_path_A = 'results/verification_reproducibility_gemma3_27B_0_1206.csv'
+csv_path_B = 'results/verification_reproducibility_gemma3_27B_1_1206.csv'
 
 # 実行
 compare_csv_files(csv_path_A, csv_path_B)

@@ -21,6 +21,7 @@ namespace fs = std::filesystem;
 #include "nlohmann/json.hpp"
 #include "../include/llm_offline.hpp"
 #include "globals.hpp"
+#include "csv_comparer.hpp"
 
 using json = nlohmann::json;
 
@@ -93,7 +94,7 @@ void runSurveySimulation_Parallel(const std::vector<Person>& population,
     }
     responseManager.exportToCSV("../../results/individual_responses.csv", question_ids);
     responseManager.printSummary();
-    responseManager.exportMergedPopulationCSV("../../data/merged_population_responses.csv", population, question_ids);
+    responseManager.exportMergedPopulationCSV_BigFive("../../data/merged_population_responses.csv", population, question_ids);
 
     std::cout << "Simulation finished." << std::endl;
 }
@@ -272,7 +273,8 @@ void exportResultsToFiles(const IndividualResponseManager& responseManager,
 
     // ★ 引数で渡されたパスを使う
     responseManager.exportToCSV(individual_responses_path, question_ids);
-    responseManager.exportMergedPopulationCSV(merged_responses_path, population, question_ids);
+    responseManager.exportMergedPopulationCSV_BigFive(merged_responses_path, population, question_ids);
+    //responseManager.exportMergedPopulationCSV_BFI2(merged_responses_path, population, question_ids);
 }
 
 void runTestSurveySimulation(const std::vector<Person>& population,
@@ -528,10 +530,8 @@ const std::string REQUEST_FILE = BRIDGE_DIR + "/bridge_request.json";
 const std::string RESPONSE_FILE = BRIDGE_DIR + "/bridge_response.json";
 
 
-
 void runSurveySimulation_Resident(
     const std::vector<Person>& population,
-    const std::vector<Person>& test_population,
     const std::vector<Question>& questions,
     const std::string& system_prompt_template,
     const std::string& user_prompt_template,
@@ -541,21 +541,6 @@ void runSurveySimulation_Resident(
     if (!fs::exists(BRIDGE_DIR)) {
         fs::create_directories(BRIDGE_DIR);
     }
-
-    // IndividualResponseManager responseManager_for_warmup;
-    //
-    // std::cout << "[C++] Warming up..." << std::endl;
-    // for (const auto& person : test_population) {
-    //     std::cout << "[C++] Warming up with Agent ID: " << person.person_id << "..." << std::endl;
-    //     sendRequestAndReceiveResponse(
-    //         person,
-    //         questions,
-    //         system_prompt_template,
-    //         user_prompt_template,
-    //         responseManager_for_warmup,
-    //         nullptr // ログファイルポインタは渡さない
-    //     );
-    // }
 
     // ログファイルの準備 (ファイル名は適宜設定)
     time_t now = time(0);
@@ -705,15 +690,63 @@ void exportResultsByTemplate(const IndividualResponseManager& responseManager,
     tm* ltm = localtime(&now);
     char timestamp[20];
     strftime(timestamp, sizeof(timestamp), "%Y%m%d_%H%M%S", ltm);
-    //std::string filename = "../../results/for_test_individual_responses_" + template_name +"_"+ timestamp + "_gemma3.csv";
-    std::string filename = "../../results/for_test_individual_responses_" + template_name +"_"+ timestamp + "_gemma3_27B.csv";
+    //std::string filename = "../../results/for_test_individual_responses_" + template_name +"_"+ timestamp + "_gemma3_12B.csv";
+    // std::string filename = "../../results/for_test_individual_responses_" + template_name +"_"+ timestamp + "_gemma3_27B.csv";
     //std::string filename = "../../results/for_test_individual_responses_" + template_name +"_"+ timestamp + "_qwen3_32B.csv";
-    //std::string filename = "../../results/for_test_individual_responses_" + template_name +"_"+ timestamp + "_phi4-reasoning-plus.csv";
+    //std::string filename = "../../results/for_test_individual_responses_" + template_name +"_"+ timestamp + "_phi4.csv";
     // std::string filename = "../../results/for_test_individual_responses_" + template_name +"_"+ timestamp + "_deepseek.csv";
     //std::string filename = "../../results/for_test_individual_responses_" + template_name +"_"+ timestamp + "_Mistral_24B.csv";
 
     //std::string filename = "../../results/for_test_individual_responses_" + template_name +"_"+ timestamp + "_gpt-oss_" + count +  ".csv";
+    std::string filename = "../../results/verification_reproducibility_gemma3_27B_" + count + ".csv";
     MyGlobals::g_counter += 1;
     responseManager.exportToCSV(filename, question_ids);
     responseManager.printSummary();
+}
+
+void verificationReproducibility(const std::vector<Person>& population,
+                                const std::vector<Question>& questions,
+                                const std::map<std::string, std::string>& prompt_templates,
+                                const std::string& user_prompt_template){
+    int repeat_times = 2;
+    MyGlobals::g_counter = 0;
+    for (int i=0; i<repeat_times; i++) {
+        runTestSurveySimulation_Resident(population,questions,prompt_templates,user_prompt_template);
+    }
+    int total_count = MyGlobals::g_counter.load();
+    if (total_count != repeat_times) {
+        std::cerr << "[Error] カウント不一致が発生しました！" << std::endl;
+        throw std::runtime_error("Export count mismatch error.");
+    } else {
+        std::cout << "[Success] 正常に " << total_count << " 回出力されました。" << std::endl;
+    }
+
+    std::vector<std::string> fileList={};
+    for (int file_count_int=0; file_count_int<repeat_times; file_count_int++){
+        std::string file_count = std::to_string(file_count_int);
+        std::string filename = "../../results/verification_reproducibility_gemma3_27B_" + file_count + ".csv";
+        fileList.push_back(filename);
+    }
+
+    std::cout << "Starting comparison of " << fileList.size() << " main files..." << std::endl;
+    std::cout << "--------------------------------------------------" << std::endl;
+
+    //総当たりで比較する二重ループ
+    // i: 比較元のインデックス
+    for (size_t i = 0; i < fileList.size(); ++i) {
+
+        // j: 比較先のインデックス
+        // j = i + 1 から始めることで、以下の無駄を省いています：
+        // 1. 自分自身との比較 (test_file0 vs test_file0)
+        // 2. 重複した逆パターンの比較 (0 vs 1 をやった後に 1 vs 0 をやるなど)
+        for (size_t j = i + 1; j < fileList.size(); ++j) {
+
+            // 関数呼び出し
+            printCsvComparisonResult(fileList[i], fileList[j]);
+        }
+    }
+    std::cout << "--------------------------------------------------" << std::endl;
+    std::cout << "All comparisons finished of main files." << std::endl;
+
+
 }

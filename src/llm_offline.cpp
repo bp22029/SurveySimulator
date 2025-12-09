@@ -141,7 +141,7 @@ void sendRequestAndReceiveResponse(
             //*log_file << "Model: google/gemma-3-12b-it | Seed: 42 | Temp: 0\n";
             // *log_file << "Model: opneai/gpt-oss-20b | Seed: 42 | Temp: 0\n";
             //*log_file << "Model: Qwen/Qwen3-14B | Seed: 42 | Temp: 0\n";
-            //*log_file << "microsoft/Phi-4-reasoning-plus| Seed: 42 | Temp: 0\n";
+            //*log_file << "microsoft/phi-4| Seed: 42 | Temp: 0\n";
             // *log_file << "deepseek-ai/DeepSeek-R1-Distill-Qwen-14B | Seed: 42 | Temp: 0\n";
             *log_file << "Model: google/gemma-3-27b-it | Seed: 42 | Temp: 0\n";
             //*log_file << "Model: Qwen/Qwen3-32B | Seed: 42 | Temp: 0\n";
@@ -159,4 +159,104 @@ void sendRequestAndReceiveResponse(
             // log_file->flush();
         }
     }
+}
+
+std::map<std::string, int> getResponsesForPerson(
+    const Person& person,
+    const std::vector<Question>& questions,
+    const std::string& system_prompt_template,
+    const std::string& user_prompt_template,
+    std::ofstream* log_file
+) {
+    std::map<std::string, int> responses_map;
+    json requests = json::array();
+
+    // 1. リクエスト作成
+    for (const auto& q : questions) {
+        std::string sys_prompt = generatePrompt(system_prompt_template, person, q);
+        std::string usr_prompt = generatePrompt(user_prompt_template, person, q);
+
+        // IDは "questionID" だけでOK（1人分なので）
+        requests.push_back({
+            {"id", q.id},
+            {"system_prompt", sys_prompt},
+            {"user_prompt", usr_prompt}
+        });
+    }
+
+    // 2. ファイル書き出し (bridge_request.json)
+    // ※競合回避のため、一時ファイル経由での書き込みを推奨
+    std::string temp_request_path = REQUEST_FILE + ".tmp";
+    std::ofstream req_file(temp_request_path);
+    if (!req_file.is_open()) {
+        std::cerr << "Error: Cannot open request file." << std::endl;
+        return responses_map; // 空のマップを返す
+    }
+    req_file << requests.dump();
+    req_file.close();
+    fs::rename(temp_request_path, REQUEST_FILE); // アトミックに移動
+
+    // 3. 応答待ち (ポーリング)
+    // ※無限ループ防止のためタイムアウトを入れるのが安全です
+    int timeout_ms = 300000; // 300秒
+    int waited_ms = 0;
+    while (!fs::exists(RESPONSE_FILE)) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        waited_ms += 50;
+        if (waited_ms > timeout_ms) {
+            std::cerr << "Timeout waiting for LLM response." << std::endl;
+            return responses_map;
+        }
+    }
+    // 書き込み完了待ち
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+
+    // 4. 結果読み込み
+    std::ifstream res_file(RESPONSE_FILE);
+    json responses_json;
+    try {
+        res_file >> responses_json;
+    } catch (...) {
+        std::cerr << "JSON Parse Error" << std::endl;
+        res_file.close();
+        fs::remove(RESPONSE_FILE); // 壊れたファイルは消す
+        return responses_map;
+    }
+    res_file.close();
+    fs::remove(RESPONSE_FILE); // 読み終わったら削除
+
+    // 5. マップに格納 (ここが重要)
+    for (const auto& item : responses_json) {
+        std::string q_id = item["id"];
+        std::string full_response = item["response"];
+
+        // タグから数字を抽出
+        int choice = extractAnswerFromTags(full_response);
+
+        // 有効な回答ならマップに追加
+        if (choice != -1) {
+            responses_map[q_id] = choice;
+        }
+
+        if (log_file && log_file->is_open()) {
+            *log_file << "--------------------------------------------------\n";
+            // SAの試行中であることを明示しておくと後で見やすいです
+            *log_file << "[Optimization Trial] Agent ID: " << person.person_id << " | Question ID: " << q_id << "\n";
+            *log_file << "Model: google/gemma-3-27b-it | Seed: 42 | Temp: 0\n";
+
+            // 思考プロセスの抽出と記録
+            std::string thinking = extractThinkingLog(full_response);
+            *log_file << "\n[Reasoning Content]\n" << thinking << "\n";
+
+            *log_file << "\n[Final Answer]\n" << choice << "\n";
+            *log_file << "\n";
+
+            // SAは高速に回るため、頻繁なflushは遅延の原因になりますが、
+            // デバッグ中は flush しておいた方が落ちた時にログが残ります。
+            // log_file->flush();
+        }
+    }
+
+
+    return responses_map; // これが new_responses になる
 }
