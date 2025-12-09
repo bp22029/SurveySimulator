@@ -10,6 +10,9 @@ struct NeuroticismTrait {
     float anxiety;          // 不安
     float depression;       // 抑うつ
     float emotional_volatility; // 情緒不安定性
+    void updateScore() {
+        score = (anxiety + depression + emotional_volatility) / 3.0f;
+    }
 };
 
 // 勤勉性とそのファセット
@@ -18,6 +21,9 @@ struct ConscientiousnessTrait {
     float organization;     // 秩序性
     float productivity;     // 生産性
     float responsibility;   // 責任感
+    void updateScore() {
+        score = (organization + productivity + responsibility) / 3.0f;
+    }
 };
 
 // 外向性とそのファセット
@@ -26,6 +32,9 @@ struct ExtraversionTrait {
     float sociability;      // 社交性
     float assertiveness;    // 自己主張性
     float energy_level;     // 活力
+    void updateScore() {
+        score = (sociability + assertiveness + energy_level) / 3.0f;
+    }
 };
 
 // 協調性とそのファセット
@@ -34,6 +43,9 @@ struct AgreeablenessTrait {
     float compassion;       // 思いやり
     float respectfulness;   // 敬意
     float trust;            // 信用
+    void updateScore() {
+        score = (compassion + respectfulness + trust) / 3.0f;
+    }
 };
 
 // 開放性とそのファセット
@@ -42,6 +54,9 @@ struct OpennessTrait {
     float intellectual_curiosity; // 知的好奇心
     float aesthetic_sensitivity;  // 美的感性
     float creative_imagination;   // 創造的想像力
+    void updateScore() {
+        score = (intellectual_curiosity + aesthetic_sensitivity + creative_imagination) / 3.0f;
+    }
 };
 
 // Big Fiveの性格特性を格納する構造体

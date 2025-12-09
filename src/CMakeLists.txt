@@ -12,6 +12,7 @@ add_library(SurveySimulatorLib STATIC
         cross_table_generator.cpp
         llm_offline.cpp
         csv_comparer.cpp
+        optimization_manager.cpp
 
         # ヘッダファイルも追加 (includeディレクトリへのパスは (3) で指定)
         ../include/data_loader.hpp
@@ -30,6 +31,10 @@ add_library(SurveySimulatorLib STATIC
         ../include/llm_offline.hpp
         ../include/csv_comparer.hpp
         ../include/globals.hpp
+        ../include/optimization_manager.hpp
+        ../include/experiment_runner.hpp
+        experiment_runner.cpp
+
 )
 
 # (2) メインの実行ファイル "SurveySimulator" を定義

@@ -8,6 +8,9 @@
 #include <cstdlib>
 #include <random>
 #include <chrono>
+#include <algorithm> // ★重要: std::findのために追加
+#include <iterator>  // ★重要: std::distanceのために追加
+#include <map>       // std::mapのために追加
 
 void randomBigFive(Person& person) {
     // static std::random_device rd;
@@ -56,21 +59,11 @@ void randomBFI2(Person& person) {
 
 
     // 各ファセット尺度のスコアを平均してドメイン尺度を設定
-    person.personality.neuroticism.score = (person.personality.neuroticism.anxiety +
-                                            person.personality.neuroticism.depression +
-                                            person.personality.neuroticism.emotional_volatility) / 3.0f;
-    person.personality.conscientiousness.score = (person.personality.conscientiousness.organization +
-                                                  person.personality.conscientiousness.productivity +
-                                                  person.personality.conscientiousness.responsibility) / 3.0f;
-    person.personality.extraversion.score = (person.personality.extraversion.sociability +
-                                             person.personality.extraversion.assertiveness +
-                                             person.personality.extraversion.energy_level) / 3.0f;
-    person.personality.agreeableness.score = (person.personality.agreeableness.compassion +
-                                              person.personality.agreeableness.respectfulness +
-                                              person.personality.agreeableness.trust) / 3.0f;
-    person.personality.openness.score = (person.personality.openness.intellectual_curiosity +
-                                         person.personality.openness.aesthetic_sensitivity +
-                                         person.personality.openness.creative_imagination) / 3.0f;
+    person.personality.neuroticism.updateScore();
+    person.personality.conscientiousness.updateScore();
+    person.personality.extraversion.updateScore();
+    person.personality.agreeableness.updateScore();
+    person.personality.openness.updateScore();
 }
 
 
@@ -123,8 +116,8 @@ std::vector<Person> readSyntheticPopulation(const std::string& filename) {
             } else {
                 person.total_income = 0;
             }
-            //randomBigFive(person);
-            randomBFI2(person);
+            randomBigFive(person);
+            //randomBFI2(person);
             population.push_back(person);
         }
     }
@@ -322,4 +315,65 @@ std::vector<Person> readPopulationFromMergedCSV(const std::string& filename) {
 
     file.close();
     return population;
+}
+
+// ...
+
+void loadResponsesFromMergedCSV(const std::string& filename,
+                                IndividualResponseManager& responseManager,
+                                const std::vector<Question>& questions) {
+    std::ifstream file(filename);
+    if (!file.is_open()) {
+        std::cerr << "Error: Cannot open merged CSV file: " << filename << std::endl;
+        return;
+    }
+
+    std::string line;
+    std::vector<std::string> header;
+
+    // 1. ヘッダー行の解析
+    if (std::getline(file, line)) {
+        std::stringstream ss(line);
+        std::string item;
+        while (std::getline(ss, item, ',')) {
+            header.push_back(item);
+        }
+    }
+
+    // 質問IDと列インデックスの対応マップを作成
+    std::map<std::string, int> col_indices;
+    for (const auto& q : questions) {
+        auto it = std::find(header.begin(), header.end(), q.id);
+        if (it != header.end()) {
+            col_indices[q.id] = std::distance(header.begin(), it);
+        }
+    }
+
+    // 2. データ行の読み込み
+    int count = 0;
+    while (std::getline(file, line)) {
+        std::stringstream ss(line);
+        std::string item;
+        std::vector<std::string> row;
+        while (std::getline(ss, item, ',')) {
+            row.push_back(item);
+        }
+
+        if (row.empty()) continue;
+
+        try {
+            int person_id = std::stoi(row[0]); // 0列目はperson_idと仮定
+
+            for (const auto& [q_id, col_idx] : col_indices) {
+                if (col_idx < row.size() && !row[col_idx].empty()) {
+                    int choice = std::stoi(row[col_idx]);
+                    responseManager.recordResponse(person_id, q_id, choice);
+                }
+            }
+            count++;
+        } catch (...) {
+            continue; // パースエラー行はスキップ
+        }
+    }
+    std::cout << "Loaded initial responses for " << count << " agents from CSV." << std::endl;
 }

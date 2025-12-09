@@ -16,6 +16,8 @@
 #include "csv_comparer.hpp"
 #include "globals.hpp"
 #include <time.h>
+#include "experiment_runner.hpp"
+
 
 
 // nlohmann/jsonを使いやすくするために名前空間を指定
@@ -54,19 +56,18 @@ int main() {
     //シュワルツの価値観(PVQ)
     std::string system_template_path_pvq = "../../data/prompt_templates/prompt_template_PVQ_schwartz.txt";
     //複合型
-    std::string system_template_path_complex = "../../data/prompt_templates/prompt_template_complex.txt";
+    //std::string system_template_path_complex = "../../data/prompt_templates/prompt_template_complex.txt";
 
     //システムプロンプトのテンプレート群
     std::map<std::string, std::string> system_prompt_templates = {
         {"bigfive", readPromptTemplate(system_template_path_bigfive)},
-        {"bfi2", readPromptTemplate(system_template_path_bfi2)},
-        {"schwartz", readPromptTemplate(system_template_path_schwartz)},
-        {"pvq", readPromptTemplate(system_template_path_pvq)},
-       // {"complex", readPromptTemplate(system_template_path_complex)}
+        // {"bfi2", readPromptTemplate(system_template_path_bfi2)},
+        // {"schwartz", readPromptTemplate(system_template_path_schwartz)},
+        // {"pvq", readPromptTemplate(system_template_path_pvq)},
     };
 
-    //仮の一つのテンプレートを読み込む　本番実験用(BFI-2を採用)
-    std::string system_prompt_template = readPromptTemplate(system_template_path_bfi2);
+    //仮の一つのテンプレートを読み込む　本番実験用(BigFiveを採用)
+    std::string system_prompt_template = readPromptTemplate(system_template_path_bigfive);
 
     // ユーザープロンプトのテンプレートの読み込み
     std::string user_template_path = "../../data/prompt_templates/user_prompt_template.txt";
@@ -76,23 +77,32 @@ int main() {
     std::vector<SurveyResult> results;
     initializeSurveyResults(results,questions);
 
-    IndividualResponseManager responseManager;
+
 
     //検証用のシミュレーション　オフライン
-    runTestSurveySimulation_Resident(test_population,questions,system_prompt_templates,user_prompt_template);
+    //runTestSurveySimulation_Resident(test_population,questions,system_prompt_templates,user_prompt_template);
 
     //シミュレーションの実行
     //std::string log_name = "experiment_simulation_log.txt";
     //runSurveySimulation(population, questions, system_prompt_template,user_prompt_template, results, responseManager, &queryLLM);
     //runSurveySimulation_Parallel(population, questions, prompt_template, results, 64); // 64スレッドで実行
-
-    //本番用実験　オフライン推論
-    //runSurveySimulation_Resident(population,test_population, questions, system_prompt_template,user_prompt_template, responseManager);
-
-     // responseManager.printSummary();
-     // exportResultsToFiles(responseManager,population,questions,
-     //                      "../../results/individual_responses.csv",
-     //                      "../../data/merged_population_responses.csv");
+    //
+    // // 本番用実験　オフライン推論
+    //   IndividualResponseManager responseManager;
+    //   runSurveySimulation_Resident(population, questions, system_prompt_template,user_prompt_template, responseManager);
+    //
+    //   responseManager.printSummary();
+    //   exportResultsToFiles(responseManager,population,questions,
+    //                          "../../results/individual_responses_BigFive_03.csv",
+    //                          "../../data/merged_population_responses_BigFive_03.csv");
+    //
+    //   IndividualResponseManager responseManager2;
+    //   runSurveySimulation_Resident(population, questions, system_prompt_template,user_prompt_template, responseManager2);
+    //
+    //   responseManager2.printSummary();
+    //   exportResultsToFiles(responseManager2,population,questions,
+    //                          "../../results/individual_responses_BigFive_04.csv",
+    //                          "../../data/merged_population_responses_BigFive_04.csv");
 
 
     // テスト用シミュレーションの実行
@@ -108,16 +118,16 @@ int main() {
     //     num_threads
     // );
 
-
+    //
     // // 5．csvからクロス集計を行う
-    // std::string merged_filename = "../data/merged_population_responses.csv";
+    // std::string merged_filename = "../../data/merged_population_responses_BigFive_01.csv";
     // std::ifstream file(merged_filename);
     // if (!file.is_open()) {
     //     std::cerr << "ファイルを開けません: " << merged_filename << std::endl;
     //     return 1;
     // }
     // CrossGenderTable cross_gender_table = buildCrossGenderTableFromCsv(merged_filename, questions);
-    // printCrossGenderTable(cross_gender_table);[
+    // printCrossGenderTable(cross_gender_table);
 
 
 
@@ -129,12 +139,57 @@ int main() {
     //     return 1;
     // }
 
+    //verificationReproducibility(test_population,questions,system_prompt_templates,user_prompt_template);
+
+    // std::string main_file_01 = "../../data/merged_population_responses_BigFive_01.csv";
+    // std::string main_file_02 = "../../data/merged_population_responses_BigFive_02.csv";
+    // std::string main_file_03 = "../../data/merged_population_responses_BigFive_03.csv";
+    // std::string main_file_04 = "../../data/merged_population_responses_BigFive_04.csv";
+    //
+    // std::vector<std::string> fileList = {
+    //     main_file_01, main_file_02, main_file_03, main_file_04
+    // };
+    // std::cout << "Starting comparison of " << fileList.size() << " main files..." << std::endl;
+    // std::cout << "--------------------------------------------------" << std::endl;
+    //
+    // //総当たりで比較する二重ループ
+    // // i: 比較元のインデックス
+    // for (size_t i = 0; i < fileList.size(); ++i) {
+    //
+    //     // j: 比較先のインデックス
+    //     // j = i + 1 から始めることで、以下の無駄を省いています：
+    //     // 1. 自分自身との比較 (test_file0 vs test_file0)
+    //     // 2. 重複した逆パターンの比較 (0 vs 1 をやった後に 1 vs 0 をやるなど)
+    //     for (size_t j = i + 1; j < fileList.size(); ++j) {
+    //
+    //         // 関数呼び出し
+    //         printCsvComparisonResult(fileList[i], fileList[j]);
+    //     }
+    // }
+    // std::cout << "--------------------------------------------------" << std::endl;
+    // std::cout << "All comparisons finished of main files." << std::endl;
 
 
+    // コンフィグ設定
+    ExperimentConfig config;
+    config.max_iterations = 10000;       // 試行回数
+    config.initial_temperature = 0.05;   // 初期温度（適宜調整）
+    config.cooling_rate = 0.9998;         // 冷却率
+    config.mutation_step_size = 0.05;   // 変化幅
+    config.real_data_path = "../../data/real_ratios.csv"; // 作成した正解データ
+    config.log_file_path = "../../log/sa_optimization.csv";
 
-
+    // 実験開始
+    runOptimizationExperiment(
+        population,
+        questions,
+        system_prompt_templates,
+        user_prompt_template,
+        config
+    );
 
 
 
     return 0;
 }
+

@@ -9,4 +9,6 @@ namespace MyGlobals {
     inline std::atomic<int> g_counter = 0; // グローバル変数の例
 }
 
+
+
 #endif
