@@ -83,3 +83,19 @@ std::string extractThinkingLog(const std::string& text) {
     }
     return "";
 }
+
+std::string extractThinkLog(const std::string& text) {
+    // . は改行を含まないため、改行を含むマッチには工夫が必要ですが、
+    // C++のregexでは少し複雑になるため、findを使うのが最速です。
+    std::string start_tag = "<think>";
+    std::string end_tag = "</think>";
+
+    size_t start_pos = text.find(start_tag);
+    size_t end_pos = text.find(end_tag);
+
+    if (start_pos != std::string::npos && end_pos != std::string::npos) {
+        start_pos += start_tag.length();
+        return text.substr(start_pos, end_pos - start_pos);
+    }
+    return "";
+}

@@ -10,6 +10,8 @@
 #include <algorithm>
 #include <iomanip>
 
+#include "csv_comparer.hpp"
+
 namespace fs = std::filesystem;
 
 // ファイルパス定数（環境に合わせて調整してください）
@@ -25,12 +27,36 @@ Person mutatePerson(const Person& origin, double step_size, std::mt19937& gen) {
     // 0.0～1.0にクランプするラムダ関数
     auto clamp = [](float v) { return std::max(0.0f, std::min(1.0f, v)); };
 
-    // 5つの特性すべてにノイズを加える
-    mutated.personality.neuroticism.score     = clamp(mutated.personality.neuroticism.score     + (float)dist_change(gen));
-    mutated.personality.conscientiousness.score = clamp(mutated.personality.conscientiousness.score + (float)dist_change(gen));
-    mutated.personality.extraversion.score    = clamp(mutated.personality.extraversion.score    + (float)dist_change(gen));
-    mutated.personality.agreeableness.score   = clamp(mutated.personality.agreeableness.score   + (float)dist_change(gen));
-    mutated.personality.openness.score        = clamp(mutated.personality.openness.score        + (float)dist_change(gen));
+    // // 5つの特性すべてにノイズを加える bigfiveのとき
+    // mutated.personality.neuroticism.score     = clamp(mutated.personality.neuroticism.score     + (float)dist_change(gen));
+    // mutated.personality.conscientiousness.score = clamp(mutated.personality.conscientiousness.score + (float)dist_change(gen));
+    // mutated.personality.extraversion.score    = clamp(mutated.personality.extraversion.score    + (float)dist_change(gen));
+    // mutated.personality.agreeableness.score   = clamp(mutated.personality.agreeableness.score   + (float)dist_change(gen));
+    // mutated.personality.openness.score        = clamp(mutated.personality.openness.score        + (float)dist_change(gen));
+
+    //bfi2のとき
+    mutated.personality.neuroticism.anxiety = clamp(mutated.personality.neuroticism.anxiety + (float)dist_change(gen));
+    mutated.personality.neuroticism.depression = clamp(mutated.personality.neuroticism.depression + (float)dist_change(gen));
+    mutated.personality.neuroticism.emotional_volatility = clamp(mutated.personality.neuroticism.emotional_volatility + (float)dist_change(gen));
+    mutated.personality.conscientiousness.organization = clamp(mutated.personality.conscientiousness.organization + (float)dist_change(gen));
+    mutated.personality.conscientiousness.productivity = clamp(mutated.personality.conscientiousness.productivity + (float)dist_change(gen));
+    mutated.personality.conscientiousness.responsibility = clamp(mutated.personality.conscientiousness.responsibility + (float)dist_change(gen));
+    mutated.personality.extraversion.sociability = clamp(mutated.personality.extraversion.sociability + (float)dist_change(gen));
+    mutated.personality.extraversion.assertiveness = clamp(mutated.personality.extraversion.assertiveness + (float)dist_change(gen));
+    mutated.personality.extraversion.energy_level = clamp(mutated.personality.extraversion.energy_level + (float)dist_change(gen));
+    mutated.personality.agreeableness.compassion = clamp(mutated.personality.agreeableness.compassion + (float)dist_change(gen));
+    mutated.personality.agreeableness.respectfulness = clamp(mutated.personality.agreeableness.respectfulness + (float)dist_change(gen));
+    mutated.personality.agreeableness.trust = clamp(mutated.personality.agreeableness.trust + (float)dist_change(gen));
+    mutated.personality.openness.intellectual_curiosity = clamp(mutated.personality.openness.intellectual_curiosity + (float)dist_change(gen));
+    mutated.personality.openness.aesthetic_sensitivity = clamp(mutated.personality.openness.aesthetic_sensitivity + (float)dist_change(gen));
+    mutated.personality.openness.creative_imagination = clamp(mutated.personality.openness.creative_imagination + (float)dist_change(gen));
+    // 各ドメイン尺度を更新
+    mutated.personality.neuroticism.updateScore();
+    mutated.personality.conscientiousness.updateScore();
+    mutated.personality.extraversion.updateScore();
+    mutated.personality.agreeableness.updateScore();
+    mutated.personality.openness.updateScore();
+
 
     return mutated;
 }
@@ -76,13 +102,14 @@ void runOptimizationExperiment(
     }
 
     std::random_device rd;
-    std::mt19937 gen(rd());
+    unsigned int seed = 42; // 固定シードで再現性を確保したい場合
+    std::mt19937 gen(seed);
     std::uniform_int_distribution<> dist_pop(0, population.size() - 1); // 一様分布に基づく個体選択
     std::uniform_real_distribution<> dist_prob(0.0, 1.0);  // 0.0～1.0の一様分布
 
     std::ofstream main_log(final_log_path);
     //ログファイルのヘッダー　
-    main_log << "iteration,temperature,current_mae,result,target_person_id,accepted\n";
+    main_log << "iteration,temperature,current_mae,result,target_person_id,accepted,delta\n";
 
     // LLM思考プロセス記録用ログ
     std::string detail_log_path = final_log_path + ".detail.txt";
@@ -97,41 +124,56 @@ void runOptimizationExperiment(
         return;
     }
 
+    std::string sys_tmpl = prompt_templates.at("bfi2");
     // -------------------------------------------------
-    // 1. 初期状態の構築 (ベースライン作成)　本番時はコメントアウトを外す
+    // 1. 初期状態の構築 (ベースライン作成)　
     // -------------------------------------------------
-    std::cout << "[Init] Generating baseline responses using runSurveySimulation_Resident..." << std::endl;
-
-    // vLLM用のシステムプロンプト (BigFive用)
-    // ※ main.cpp のキー名に合わせてください ("bigfive" や "default" など)
-    std::string sys_tmpl = prompt_templates.at("bigfive");
+    // std::cout << "[Init] Generating baseline responses using runSurveySimulation_Resident..." << std::endl;
     //
-    //
-    // runSurveySimulation_Resident(
-    //     population,
-    //     questions,
-    //     sys_tmpl,
-    //     user_prompt_template,
-    //     responseManager
-    // );
-    // // タイムスタンプを使ってユニークな名前にします
-    // std::string init_csv_path = "../../results/individual_responses_" + timestamp + "_initial.csv";
-    // std::string init_merged_path = "../../data/merged_population_" + timestamp + "_initial.csv";
-    // std::cout << "[Init] Exporting initial CSVs..." << std::endl;
-    // exportResultsToFiles(
-    // responseManager,
-    // population,
-    // questions,
-    // init_csv_path,
-    // init_merged_path
-    // );
+     // vLLM用のシステムプロンプト (BigFive用)
+     // ※ main.cpp のキー名に合わせてください ("bigfive" や "default" など)
+     //std::string sys_tmpl = prompt_templates.at("bigfive");
+     //bif2用のシステムプロンプトに変更する場合は上記を"bfi2"に変更してください
+
+     //
+
+     //
+     // runSurveySimulation_Resident(
+     //     population,
+     //     questions,
+     //     sys_tmpl,
+     //     user_prompt_template,
+     //     responseManager
+     // );
+     // // タイムスタンプを使ってユニークな名前にします
+     // std::string init_csv_path = "../../results/individual_responses_" + timestamp + "_initial.csv";
+     // std::string init_merged_path = "../../data/merged_population_" + timestamp + "_initial.csv";
+     // std::cout << "[Init] Exporting initial CSVs..." << std::endl;
+     // exportResultsToFiles(
+     // responseManager,
+     // population,
+     // questions,
+     // init_csv_path,
+     // init_merged_path
+     // );
+
+    std::string response_bfi2_path = "../../data/merged_population_20251224_105952_initial.csv";
+
+     // if (isCsvIdentical(init_merged_path,response_bfi2_path)) {
+     //     // CSVが同一であれば成功
+     //     std::cout << "[Init] Initial merged CSV matches the benchmark file." << std::endl;
+     // } else {
+     //     // CSVが異なれば警告しプログラムを終了
+     //     std::cerr << "[Error] Initial merged CSV does not match the benchmark file!" << std::endl;
+     //     std::exit(1);
+     // }
 
 
 
     // -------------------------------------------------
-    // 1. 初期状態の構築 (CSVから復元して5時間をスキップ！) 本番時はコメントアウト
+    // 1. 初期状態の構築 (CSVから復元して5時間をスキップ！)
     // -------------------------------------------------
-    std::string initial_csv_path = "../../data/merged_population_responses_BigFive_01.csv"; // ※正しいパスを指定してください
+    std::string initial_csv_path = "../../data/merged_population_20251231_151241_initial.csv"; // ※正しいパスを指定してください
     std::cout << "[Init] Loading baseline from CSV: " << initial_csv_path << std::endl;
 
     // A. 人口データの復元
@@ -148,6 +190,8 @@ void runOptimizationExperiment(
     loadResponsesFromMergedCSV(initial_csv_path, responseManager, questions);
 
 
+
+    //
 
     // 集計と初期MAE計算
     std::vector<std::string> q_ids;
@@ -169,105 +213,133 @@ void runOptimizationExperiment(
     double temperature = config.initial_temperature;
     std::string checkpoint_path = "../../data/checkpoint_latest.csv"; //バックアップ用パス
 
+    // ループの外でインデックスリストを作成
+    std::vector<int> agent_indices(population.size());
+    std::iota(agent_indices.begin(), agent_indices.end(), 0); // 0, 1, 2... と埋める
+    // 最初のシャッフル
+    std::shuffle(agent_indices.begin(), agent_indices.end(), gen);
+    int current_list_idx = 0; // リストの何番目を見ているか
+
     for (int iter = 0; iter < config.max_iterations; ++iter) {
         // A. ターゲット選択と変異
         //int target_idx = dist_pop(gen); //ランダムすぎるため、以下の方法に変更
 
-        // ループの外でインデックスリストを作成
-        std::vector<int> agent_indices(population.size());
-        std::iota(agent_indices.begin(), agent_indices.end(), 0); // 0, 1, 2... と埋める
-        // 最初のシャッフル
-        std::shuffle(agent_indices.begin(), agent_indices.end(), gen);
-        int current_list_idx = 0; // リストの何番目を見ているか
-
-        for (int iter = 0; iter < config.max_iterations; ++iter) {
-
-            // A. ターゲット選択（リストから順番に取る）
-            int target_idx = agent_indices[current_list_idx];
-            // 次の人の準備
-            current_list_idx++;
-            if (current_list_idx >= agent_indices.size()) {
-                // 一周しきったら、再度シャッフルして先頭に戻る
-                std::shuffle(agent_indices.begin(), agent_indices.end(), gen);
-                current_list_idx = 0;
-            }
+        // A. ターゲット選択（リストから順番に取る）
+        int target_idx = agent_indices[current_list_idx];
+        // 次の人の準備
+        current_list_idx++;
+        if (current_list_idx >= agent_indices.size()) {
+            // 一周しきったら、再度シャッフルして先頭に戻る
+            std::shuffle(agent_indices.begin(), agent_indices.end(), gen);
+            current_list_idx = 0;
+        }
 
 
-            Person& current_person = population[target_idx];
-            Person mutated_person = mutatePerson(current_person, config.mutation_step_size, gen);
+        Person& current_person = population[target_idx];
+        Person mutated_person = mutatePerson(current_person, config.mutation_step_size, gen);
 
-            // B. 新しいパラメータで推論 (1人分)
-            std::map<std::string, int> new_responses = getResponsesForPerson(
-                mutated_person, questions, sys_tmpl, user_prompt_template, &detail_log
-            );
-
-            // C. 現在の回答を取得
-            IndividualResponse old_res_obj = responseManager.getPersonResponses(current_person.person_id);
-            std::map<std::string, int> old_responses = old_res_obj.responses;
-
-            // D. 評価 (Try Update)
-            double next_mae = optManager.tryUpdate(old_responses, new_responses);
-            double delta = next_mae - current_mae;
-
-            // E. 採用判定 (Metropolis法)
-            bool accepted = false;
-            if (delta < 0) {
-                accepted = true; // 改善
-            } else {
-                // 改悪でも確率で採用
-                double prob = std::exp(-delta / temperature);
-                if (dist_prob(gen) < prob) {
-                    accepted = true;
-                }
-            }
-
-            // F. 更新処理
-            if (accepted) {
-                optManager.commitUpdate(old_responses, new_responses);
-
-                for(auto const& [qid, choice] : new_responses) {
-                    responseManager.recordResponse(current_person.person_id, qid, choice);
-                }
-                // 人口データの更新
-                population[target_idx] = mutated_person;
-                current_mae = next_mae;
+        // B. 新しいパラメータで推論 (1人分)
+        std::map<std::string, int> new_responses = getResponsesForPerson(
+            mutated_person, questions, sys_tmpl, user_prompt_template, &detail_log
+        );
 
 
-                responseManager.exportMergedPopulationCSV_BigFive(
-                    checkpoint_path,
-                    population,
-                    q_ids
-                );
-            }
+        // LLM停止・タイムアウト等で空が返ったら、この試行は無効としてスキップ（性格値も回答も更新しない）
+        if (new_responses.empty()) {
+            std::cerr << "[Warn] LLM response is empty (timeout or worker stopped). Skip this iteration. "
+                      << "iter=" << iter << " agent=" << current_person.person_id << std::endl;
 
-            // G. ログと温度更新
-            std::cout << "Iter " << iter << " | T=" << std::fixed << std::setprecision(4) << temperature
-                      << " | MAE=" << current_mae
-                      << " | " << (accepted ? "[ACC]" : "[REJ]")
-                      << " | Agent=" << current_person.person_id
-                      << " | d=" << delta << std::endl;
-
-            main_log << iter << "," << temperature << "," << current_mae << ","
-                     << (accepted ? "accepted" : "rejected") << ","
-                     << current_person.person_id << "," << accepted << "\n";
+            // main_log にも残したい場合（任意）
+            main_log << iter << ","
+                     << temperature << ","
+                     << current_mae << ","
+                     << "llm_error_empty" << ","
+                     << current_person.person_id << ","
+                     << false << ","
+                     << 0.0 << "\n";
             main_log.flush();
 
             temperature *= config.cooling_rate;
+            continue;
         }
 
-        std::cout << "=== Experiment Finished ===" << std::endl;
-        std::cout << "Final MAE: " << current_mae << std::endl;
+        // C. 現在の回答を取得
+        IndividualResponse old_res_obj = responseManager.getPersonResponses(current_person.person_id);
+        std::map<std::string, int> old_responses = old_res_obj.responses;
 
-        // 最終的な人口データの保存などをここで行うと良いでしょう
-        std::string final_csv_path = "../../results/individual_responses_" + timestamp + "_final.csv";
-        std::string final_merged_path = "../../data/merged_population_" + timestamp + "_final.csv";
-        std::cout << "[Final] Exporting final CSVs..." << std::endl;
-        exportResultsToFiles(
-            responseManager,
-            population,
-            questions,
-            final_csv_path,
-            final_merged_path
-        );
+        // D. 評価 (Try Update)
+        double next_mae = optManager.tryUpdate(old_responses, new_responses);
+        double delta = next_mae - current_mae;
+
+        // E. 採用判定 (Metropolis法)
+        bool accepted = false;
+        if (delta < 0) {
+            accepted = true; // 改善
+        } else {
+            // 改悪でも確率で採用
+            double prob = std::exp(-delta / temperature);
+            if (dist_prob(gen) < prob) {
+                accepted = true;
+            }
+        }
+
+        // F. 更新処理
+        if (accepted) {
+            optManager.commitUpdate(old_responses, new_responses);
+
+            for(auto const& [qid, choice] : new_responses) {
+                responseManager.recordResponse(current_person.person_id, qid, choice);
+            }
+            // 人口データの更新
+            population[target_idx] = mutated_person;
+            current_mae = next_mae;
+
+
+            // responseManager.exportMergedPopulationCSV_BigFive(
+            //     checkpoint_path,
+            //     population,
+            //     q_ids
+            // );
+            responseManager.exportMergedPopulationCSV_BFI2(
+                checkpoint_path,
+                population,
+                q_ids
+            );
+        }
+
+        // G. ログと温度更新
+        std::cout << "Iter " << iter << " | T=" << std::fixed << std::setprecision(4) << temperature
+                  << " | MAE=" << current_mae
+                  << " | " << (accepted ? "[ACC]" : "[REJ]")
+                  << " | Agent=" << current_person.person_id
+                  << " | d=" << delta << std::endl;
+
+        // ファイル出力に delta を追加しました
+        main_log << iter << ","
+                 << temperature << ","
+                 << current_mae << ","
+                 << (accepted ? "accepted" : "rejected") << ","
+                 << current_person.person_id << ","
+                 << accepted << ","
+                 << delta << "\n";  // ここに delta を追加
+
+        main_log.flush();
+
+        temperature *= config.cooling_rate;
     }
+
+    std::cout << "=== Experiment Finished ===" << std::endl;
+    std::cout << "Final MAE: " << current_mae << std::endl;
+
+    // 最終的な人口データの保存などをここで行う
+    std::string final_csv_path = "../../results/individual_responses_" + timestamp + "_final.csv";
+    std::string final_merged_path = "../../data/merged_population_" + timestamp + "_final.csv";
+    std::cout << "[Final] Exporting final CSVs..." << std::endl;
+    exportResultsToFiles(
+        responseManager,
+        population,
+        questions,
+        final_csv_path,
+        final_merged_path
+    );
 }

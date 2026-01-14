@@ -273,8 +273,8 @@ void exportResultsToFiles(const IndividualResponseManager& responseManager,
 
     // ★ 引数で渡されたパスを使う
     responseManager.exportToCSV(individual_responses_path, question_ids);
-    responseManager.exportMergedPopulationCSV_BigFive(merged_responses_path, population, question_ids);
-    //responseManager.exportMergedPopulationCSV_BFI2(merged_responses_path, population, question_ids);
+    //responseManager.exportMergedPopulationCSV_BigFive(merged_responses_path, population, question_ids);
+    responseManager.exportMergedPopulationCSV_BFI2(merged_responses_path, population, question_ids);
 }
 
 void runTestSurveySimulation(const std::vector<Person>& population,
@@ -656,7 +656,6 @@ void runTestSurveySimulation_Resident(
                 std::cout << "[C++] Processing Agent " << count << "/" << population.size()
                           << " (ID: " << person.person_id << ")..." << std::endl;
 
-                // ★ここで「1人分(52問)」を処理する関数を呼ぶ
                 //   この関数の中で ファイル書き込み -> 待機 -> 読み込み が完結します
                 sendRequestAndReceiveResponse(
                     person,
@@ -698,7 +697,13 @@ void exportResultsByTemplate(const IndividualResponseManager& responseManager,
     //std::string filename = "../../results/for_test_individual_responses_" + template_name +"_"+ timestamp + "_Mistral_24B.csv";
 
     //std::string filename = "../../results/for_test_individual_responses_" + template_name +"_"+ timestamp + "_gpt-oss_" + count +  ".csv";
-    std::string filename = "../../results/verification_reproducibility_gemma3_27B_" + count + ".csv";
+    //std::string filename = "../../results/verification_reproducibility_gemma3_27B_" + count + ".csv";
+    //std::string filename = "../../results/verification_reproducibility_qwen3_14B_" + count + ".csv";
+    //std::string filename = "../../results/verification_reproducibility_gemma3_12B_" + count + ".csv";
+    //std::string filename = "../../results/verification_reproducibility_qwen3_32B_" + count + ".csv";
+    //std::string filename = "../../results/verification_reproducibility_Qwen3-30B-A3B" + count + ".csv";
+    //std::string filename = "../../results/verification_reproducibility_Qwen3-30B-A3B-Instruct-2507" + count + ".csv";
+    std::string filename = "../../results/verification_reproducibility_phi4_" + count + ".csv";
     MyGlobals::g_counter += 1;
     responseManager.exportToCSV(filename, question_ids);
     responseManager.printSummary();
@@ -708,13 +713,14 @@ void verificationReproducibility(const std::vector<Person>& population,
                                 const std::vector<Question>& questions,
                                 const std::map<std::string, std::string>& prompt_templates,
                                 const std::string& user_prompt_template){
-    int repeat_times = 2;
+    int repeat_times = 1;
     MyGlobals::g_counter = 0;
     for (int i=0; i<repeat_times; i++) {
         runTestSurveySimulation_Resident(population,questions,prompt_templates,user_prompt_template);
     }
+    int sum_repeat_times = repeat_times*prompt_templates.size();
     int total_count = MyGlobals::g_counter.load();
-    if (total_count != repeat_times) {
+    if (total_count != sum_repeat_times) {
         std::cerr << "[Error] カウント不一致が発生しました！" << std::endl;
         throw std::runtime_error("Export count mismatch error.");
     } else {
@@ -722,9 +728,9 @@ void verificationReproducibility(const std::vector<Person>& population,
     }
 
     std::vector<std::string> fileList={};
-    for (int file_count_int=0; file_count_int<repeat_times; file_count_int++){
+    for (int file_count_int=0; file_count_int<sum_repeat_times; file_count_int++){
         std::string file_count = std::to_string(file_count_int);
-        std::string filename = "../../results/verification_reproducibility_gemma3_27B_" + file_count + ".csv";
+        std::string filename = "../../results/verification_reproducibility_phi4_" + file_count + ".csv";
         fileList.push_back(filename);
     }
 

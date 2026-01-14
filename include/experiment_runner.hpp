@@ -11,6 +11,7 @@
 struct ExperimentConfig {
     int max_iterations;       // 最大ループ回数
     double initial_temperature;   // 初期温度
+    double final_temperature;
     double cooling_rate;     // 冷却率
     double mutation_step_size ; // 性格値の変化幅（5つ同時に変えるので少し小さめに）
     std::string real_data_path;    // 正解データCSVのパス
