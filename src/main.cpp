@@ -3,6 +3,7 @@
 #include <vector>
 #include <string>
 #include <map>
+#include <cmath>
 #include <sstream>
 #include "../include/data_loader.hpp"
 #include "../include/prompt_generator.hpp"
@@ -66,8 +67,22 @@ int main() {
         // {"pvq", readPromptTemplate(system_template_path_pvq)},
     };
 
+    std::string system_template_path_qwen_bigfive = "../../data/prompt_templates/forQwen/qwen_bigfive.txt";
+    std::string system_template_path_qwen_bfi2 = "../../data/prompt_templates/forQwen/qwen_bfi2.txt";
+    std::string system_template_path_qwen_schwartz = "../../data/prompt_templates/forQwen/qwen_schwartz.txt";
+    std::string system_template_path_qwen_pvq = "../../data/prompt_templates/forQwen/qwen_pvq.txt";
+
+
+    std::map<std::string, std::string> system_prompt_templates_forQwen = {
+        {"bigfive", readPromptTemplate(system_template_path_qwen_bigfive)},
+        {"bfi2", readPromptTemplate(system_template_path_qwen_bfi2)},
+        {"schwartz", readPromptTemplate(system_template_path_qwen_schwartz)},
+        {"pvq", readPromptTemplate(system_template_path_qwen_pvq)},
+    };
+
     //仮の一つのテンプレートを読み込む　本番実験用(BigFiveを採用)
     std::string system_prompt_template = readPromptTemplate(system_template_path_bigfive);
+    std::string system_prompt_template_for_Qwen = readPromptTemplate(system_template_path_qwen_bfi2);
 
     // ユーザープロンプトのテンプレートの読み込み
     std::string user_template_path = "../../data/prompt_templates/user_prompt_template.txt";
@@ -139,7 +154,7 @@ int main() {
     //     return 1;
     // }
 
-    //verificationReproducibility(test_population,questions,system_prompt_templates,user_prompt_template);
+    //verificationReproducibility(test_population,questions,system_prompt_templates_forQwen,user_prompt_template);
 
     // std::string main_file_01 = "../../data/merged_population_responses_BigFive_01.csv";
     // std::string main_file_02 = "../../data/merged_population_responses_BigFive_02.csv";
@@ -170,20 +185,33 @@ int main() {
     // std::cout << "All comparisons finished of main files." << std::endl;
 
 
+    // IndividualResponseManager responseManager;
+    // runSurveySimulation_Resident(population, questions, system_prompt_template_for_Qwen,user_prompt_template, responseManager);
+    // //
+    // responseManager.printSummary();
+    // exportResultsToFiles(responseManager,population,questions,
+    //                        "../../results/individual_responses_bfi2_qwen.csv",
+    //                        "../../data/merged_population_responses_bfi2_qwen.csv");
+
     // コンフィグ設定
     ExperimentConfig config;
-    config.max_iterations = 10000;       // 試行回数
-    config.initial_temperature = 0.05;   // 初期温度（適宜調整）
-    config.cooling_rate = 0.9998;         // 冷却率
+    config.max_iterations = 403 * 1;       // 試行回数 （適宜調整）
+    //config.initial_temperature = 0.02019;   // 初期温度（適宜調整）
+    config.initial_temperature = 0.02034;   // 初期温度（適宜調整）
+    //config.final_temperature = 0.002252;    // 終了温度（適宜調節）
+    config.final_temperature = 0.002269;    // 終了温度（適宜調節）
+    //config.cooling_rate = 0.99946;         // 冷却率 （適宜調整）
+    config.cooling_rate = std::pow(config.final_temperature/config.initial_temperature, 1.0/config.max_iterations);
+    //config.cooling_rate = 0.9998912;
     config.mutation_step_size = 0.05;   // 変化幅
     config.real_data_path = "../../data/real_ratios.csv"; // 作成した正解データ
     config.log_file_path = "../../log/sa_optimization.csv";
 
-    // 実験開始
+    //実験開始
     runOptimizationExperiment(
         population,
         questions,
-        system_prompt_templates,
+        system_prompt_templates_forQwen,
         user_prompt_template,
         config
     );

@@ -241,7 +241,6 @@ int get_question_number(const std::string& question_id) {
         {"dq9_4", 39},
         {"dq10_1", 40},
         {"dq10_2", 41},
-        {"dq16", 42},
         {"dq22_1", 43},
         {"dq22_2", 44},
         {"dq22_3", 45},

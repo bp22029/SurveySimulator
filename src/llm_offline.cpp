@@ -25,7 +25,7 @@ const std::string BRIDGE_DIR = "/home/bp22029/vllm_bridge";
 const std::string REQUEST_FILE = BRIDGE_DIR + "/bridge_request.json";
 const std::string RESPONSE_FILE = BRIDGE_DIR + "/bridge_response.json";
 
-// ★今回追加する関数
+
 // 1人のエージェントに対する全質問をまとめて処理する
 void sendRequestAndReceiveResponse(
     const Person& person,
@@ -35,7 +35,7 @@ void sendRequestAndReceiveResponse(
     IndividualResponseManager& responseManager,
     std::ofstream* log_file // ログ出力しない場合は nullptr
 ) {
-    // --- 1. リクエストデータの作成 (52問分) ---
+    // --- 1. リクエストデータの作成 (51問分) ---
     json requests = json::array();
 
     for (const auto& q : questions) {
@@ -105,7 +105,17 @@ void sendRequestAndReceiveResponse(
     }
     res_file.close();
 
-    // 処理が終わったのでレスポンスファイルを削除
+
+    //ログファイルの準備 (ファイル名は適宜設定)
+    // time_t now = time(0);
+    // tm* ltm = localtime(&now);
+    // char timestamp[20];
+    // strftime(timestamp, sizeof(timestamp), "%Y%m%d_%H%M%S", ltm);
+    // std::string response_path = RESPONSE_FILE + "." + timestamp;
+    // fs::rename(RESPONSE_FILE, response_path);
+    //処理が終わったのでレスポンスファイルを改名
+
+
     fs::remove(RESPONSE_FILE);
 
 
@@ -140,15 +150,18 @@ void sendRequestAndReceiveResponse(
 
             //*log_file << "Model: google/gemma-3-12b-it | Seed: 42 | Temp: 0\n";
             // *log_file << "Model: opneai/gpt-oss-20b | Seed: 42 | Temp: 0\n";
-            //*log_file << "Model: Qwen/Qwen3-14B | Seed: 42 | Temp: 0\n";
+            *log_file << "Model: Qwen/Qwen3-14B | Seed: 42 | Temp: 0\n";
+            //*log_file << "Model: Qwen3-30B-A3B | Seed: 42 | Temp: 0\n";
+            //*log_file << "Model: Qwen3-30B-A3B-Instruct-2507 | Seed: 42 | Temp: 0\n";
             //*log_file << "microsoft/phi-4| Seed: 42 | Temp: 0\n";
             // *log_file << "deepseek-ai/DeepSeek-R1-Distill-Qwen-14B | Seed: 42 | Temp: 0\n";
-            *log_file << "Model: google/gemma-3-27b-it | Seed: 42 | Temp: 0\n";
+            //*log_file << "Model: google/gemma-3-27b-it | Seed: 42 | Temp: 0\n";
             //*log_file << "Model: Qwen/Qwen3-32B | Seed: 42 | Temp: 0\n";
             //*log_file << "Model: mistralai/Mistral-Small-24B-Instruct-2501| Seed: 42 | Temp: 0\n";
 
             // 思考部分の抽出
-            std::string thinking = extractThinkingLog(full_response);
+            //std::string thinking = extractThinkingLog(full_response);
+            std::string thinking = extractThinkLog(full_response);
             *log_file << "\n[Reasoning Content]\n" << thinking << "\n";
 
             int answer = extractAnswerFromTags(full_response);
@@ -237,24 +250,24 @@ std::map<std::string, int> getResponsesForPerson(
         if (choice != -1) {
             responses_map[q_id] = choice;
         }
-
-        if (log_file && log_file->is_open()) {
-            *log_file << "--------------------------------------------------\n";
-            // SAの試行中であることを明示しておくと後で見やすいです
-            *log_file << "[Optimization Trial] Agent ID: " << person.person_id << " | Question ID: " << q_id << "\n";
-            *log_file << "Model: google/gemma-3-27b-it | Seed: 42 | Temp: 0\n";
-
-            // 思考プロセスの抽出と記録
-            std::string thinking = extractThinkingLog(full_response);
-            *log_file << "\n[Reasoning Content]\n" << thinking << "\n";
-
-            *log_file << "\n[Final Answer]\n" << choice << "\n";
-            *log_file << "\n";
-
-            // SAは高速に回るため、頻繁なflushは遅延の原因になりますが、
-            // デバッグ中は flush しておいた方が落ちた時にログが残ります。
-            // log_file->flush();
-        }
+        // 書き込み量が大量のため、コメントアウト
+        // if (log_file && log_file->is_open()) {
+        //     *log_file << "--------------------------------------------------\n";
+        //     // SAの試行中であることを明示しておくと後で見やすいです
+        //     *log_file << "[Optimization Trial] Agent ID: " << person.person_id << " | Question ID: " << q_id << "\n";
+        //     *log_file << "Model: Qwen/Qwen3-14B | Seed: 42 | Temp: 0\n";
+        //
+        //     // 思考プロセスの抽出と記録
+        //     std::string thinking = extractThinkLog(full_response);
+        //     *log_file << "\n[Reasoning Content]\n" << thinking << "\n";
+        //
+        //     *log_file << "\n[Final Answer]\n" << choice << "\n";
+        //     *log_file << "\n";
+        //
+        //     // SAは高速に回るため、頻繁なflushは遅延の原因になりますが、
+        //     // デバッグ中は flush しておいた方が落ちた時にログが残ります。
+        //     // log_file->flush();
+        // }
     }
 
 

@@ -2,7 +2,6 @@ import os
 os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 os.environ["VLLM_ENABLE_V1_MULTIPROCESSING"] = "0"
 
-# --- 【対策1】 再現性のための環境変数（importより前に書くこと！） ---
 os.environ['VLLM_DETERMINISTIC_OPS'] = '1'
 os.environ['CUBLAS_WORKSPACE_CONFIG'] = ':4096:8'
 os.environ['PYTHONHASHSEED'] = '42'
@@ -36,15 +35,17 @@ def main():
     llm = LLM(
         # model="google/gemma-3-12b-it",
         # model="openai/gpt-oss-20b",
-        # model = "Qwen/Qwen3-14B",
-        model = "microsoft/phi-4",
+        model = "Qwen/Qwen3-14B",
+        # model ="Qwen/Qwen3-30B-A3B",
+        # model = "microsoft/phi-4",
         # model ="deepseek-ai/DeepSeek-R1-Distill-Qwen-14B",
         # model = "google/gemma-3-27b-it",
         tensor_parallel_size=1,
-        dtype="bfloat16", # まずはこれで。ダメなら "float16"
+        dtype="bfloat16",
         seed=42,
         gpu_memory_utilization=0.9,
-        max_model_len=4096,
+        # max_model_len=4096,
+        max_model_len=8192,
         disable_log_stats=True,
         enforce_eager=True
     )
@@ -56,7 +57,8 @@ def main():
     sampling_params = SamplingParams(
         temperature=0.0,
         top_p=1.0,
-        max_tokens=1024,
+        # max_tokens=1024,
+        max_tokens=4096,
         seed=42
     )
 

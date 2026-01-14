@@ -94,10 +94,10 @@ int OptimizationManager::mapChoiceToBin(const std::string& q_id, int choice) {
         if (choice <= 2) return 0; // 肯定 (1,2)
         return 1;                  // 否定 (3,4)
     }
-    if (q_id == "dq16") {
-        if (choice == 1) return 0; // 高齢世代
-        if (choice == 2) return 1; // 両世代
-        return 2;                  // 現役世代
+    if (q_id.find("dq11_") == 0) { // dq11_1 ～ dq11_3
+        if (choice <= 2) return 0; // 肯定 (1,2)
+        if (choice == 3) return 1; // 中立 (3)
+        return 2;                  // 否定 (4,5)
     }
     if (q_id.find("dq22_") == 0) { // dq22_1 ～ dq22_6
         if (choice <= 2) return 0; // 頻繁 (1,2)

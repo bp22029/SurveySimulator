@@ -150,12 +150,21 @@ void IndividualResponseManager::exportMergedPopulationCSV_BFI2(const std::string
     // ユーザー指定の順序: E, A, C, N, O (Domain -> Facet)
     file << "person_id,gender,prefecture_name,city_name,age,industry_type,employment_type,company_size,"
          << "family_type,role_household_type,total_income,"
-         << "extraversion,agreeableness,conscientiousness,neuroticism,openness," // Big5 Domains
-         << "sociability,assertiveness,energy_level,"          // Extraversion Facets
-         << "compassion,respectfulness,trust,"                 // Agreeableness Facets
-         << "organization,productivity,responsibility,"        // Conscientiousness Facets
-         << "anxiety,depression,emotional_volatility,"         // Neuroticism Facets
-         << "intellectual_curiosity,aesthetic_sensitivity,creative_imagination"; // Openness Facets
+         // --- Extraversion Block ---
+         << "extraversion,"                           // 親
+         << "sociability,assertiveness,energy_level," // 子
+         // --- Agreeableness Block ---
+         << "agreeableness,"                          // 親
+         << "compassion,respectfulness,trust,"        // 子
+         // --- Conscientiousness Block ---
+         << "conscientiousness,"                      // 親
+         << "organization,productivity,responsibility," // 子
+         // --- Neuroticism Block ---
+         << "neuroticism,"                            // 親
+         << "anxiety,depression,emotional_volatility," // 子
+         // --- Openness Block ---
+         << "openness,"                               // 親
+         << "intellectual_curiosity,aesthetic_sensitivity,creative_imagination"; // 子
 
     for (const auto& qid : question_ids) {
         file << "," << qid;
@@ -177,29 +186,23 @@ void IndividualResponseManager::exportMergedPopulationCSV_BFI2(const std::string
              << person.role_household_type << ","
              << person.total_income << ","
              // 性格スコア (ヘッダー順に合わせて並び替え)
-             // 1. Domains
              << person.personality.extraversion.score << ","
-             << person.personality.agreeableness.score << ","
-             << person.personality.conscientiousness.score << ","
-             << person.personality.neuroticism.score << ","
-             << person.personality.openness.score << ","
-             // 2. Extraversion Facets
              << person.personality.extraversion.sociability << ","
              << person.personality.extraversion.assertiveness << ","
              << person.personality.extraversion.energy_level << ","
-             // 3. Agreeableness Facets
+             << person.personality.agreeableness.score << ","
              << person.personality.agreeableness.compassion << ","
              << person.personality.agreeableness.respectfulness << ","
              << person.personality.agreeableness.trust << ","
-             // 4. Conscientiousness Facets
+             << person.personality.conscientiousness.score << ","
              << person.personality.conscientiousness.organization << ","
              << person.personality.conscientiousness.productivity << ","
              << person.personality.conscientiousness.responsibility << ","
-             // 5. Neuroticism Facets
+             << person.personality.neuroticism.score << ","
              << person.personality.neuroticism.anxiety << ","
              << person.personality.neuroticism.depression << ","
              << person.personality.neuroticism.emotional_volatility << ","
-             // 6. Openness Facets
+             << person.personality.openness.score << ","
              << person.personality.openness.intellectual_curiosity << ","
              << person.personality.openness.aesthetic_sensitivity << ","
              << person.personality.openness.creative_imagination;

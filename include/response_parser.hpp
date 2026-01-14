@@ -13,4 +13,6 @@ int extractAnswerFromTags(const std::string& text);
 
 std::string extractThinkingLog(const std::string& text);
 
+std::string extractThinkLog(const std::string& text);
+
 #endif // RESPONSE_PARSER_HPP

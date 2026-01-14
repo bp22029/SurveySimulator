@@ -116,8 +116,8 @@ std::vector<Person> readSyntheticPopulation(const std::string& filename) {
             } else {
                 person.total_income = 0;
             }
-            randomBigFive(person);
-            //randomBFI2(person);
+            //randomBigFive(person);
+            randomBFI2(person);
             population.push_back(person);
         }
     }
@@ -304,11 +304,27 @@ std::vector<Person> readPopulationFromMergedCSV(const std::string& filename) {
         person.family_type = fields[8];
         person.role_household_type = fields[9];
         person.total_income = fields[10].empty() ? 0 : std::stoi(fields[10]);
-        person.personality.neuroticism.score = std::stof(fields[11]);
-        person.personality.conscientiousness.score = std::stof(fields[12]);
-        person.personality.extraversion.score = std::stof(fields[13]);
-        person.personality.agreeableness.score = std::stof(fields[14]);
-        person.personality.openness.score = std::stof(fields[15]);
+        person.personality.extraversion.score = std::stof(fields[11]);
+        person.personality.extraversion.sociability = std::stof(fields[12]);
+        person.personality.extraversion.assertiveness= std::stof(fields[13]);
+        person.personality.extraversion.energy_level = std::stof(fields[14]);
+        person.personality.agreeableness.score = std::stof(fields[15]);
+        person.personality.agreeableness.compassion = std::stof(fields[16]);
+        person.personality.agreeableness.respectfulness = std::stof(fields[17]);
+        person.personality.agreeableness.trust = std::stof(fields[18]);
+        person.personality.conscientiousness.score = std::stof(fields[19]);
+        person.personality.conscientiousness.organization = std::stof(fields[20]);
+        person.personality.conscientiousness.productivity = std::stof(fields[21]);
+        person.personality.conscientiousness.responsibility = std::stof(fields[22]);
+        person.personality.neuroticism.score = std::stof(fields[23]);
+        person.personality.neuroticism.anxiety = std::stof(fields[24]);
+        person.personality.neuroticism.depression = std::stof(fields[25]);
+        person.personality.neuroticism.emotional_volatility = std::stof(fields[26]);
+        person.personality.openness.score = std::stof(fields[27]);
+        person.personality.openness.intellectual_curiosity = std::stof(fields[28]);
+        person.personality.openness.aesthetic_sensitivity = std::stof(fields[29]);
+        person.personality.openness.creative_imagination = std::stof(fields[30]);
+
 
         population.push_back(person);
     }
