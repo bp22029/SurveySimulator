@@ -240,7 +240,7 @@ void runOptimizationExperiment(
 
         // B. 新しいパラメータで推論 (1人分)
         std::map<std::string, int> new_responses = getResponsesForPerson(
-            mutated_person, questions, sys_tmpl, user_prompt_template, &detail_log
+            mutated_person, questions, sys_tmpl, user_prompt_template, BRIDGE_DIR, &detail_log
         );
 
 

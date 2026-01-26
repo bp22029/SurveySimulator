@@ -18,6 +18,7 @@
 #include "globals.hpp"
 #include <time.h>
 #include "experiment_runner.hpp"
+#include "experiment_runner_parallel.hpp"
 
 
 
@@ -147,12 +148,12 @@ int main() {
 
 
 
-    // 統合したcsvから人口データを読み込む
-    // std::string merged_filename = "../../data/merged_population_responses.csv";
-    // std::vector<Person> merged_population = readPopulationFromMergedCSV(merged_filename);
-    // if (merged_population.empty()) {
-    //     return 1;
-    // }
+    //統合したcsvから人口データを読み込む
+    std::string merged_filename = "../../data/parallel_merged_20260117_014011.csv";
+    std::vector<Person> merged_population = readPopulationFromMergedCSV(merged_filename);
+    if (merged_population.empty()) {
+        return 1;
+    }
 
     //verificationReproducibility(test_population,questions,system_prompt_templates_forQwen,user_prompt_template);
 
@@ -185,13 +186,13 @@ int main() {
     // std::cout << "All comparisons finished of main files." << std::endl;
 
 
-    // IndividualResponseManager responseManager;
-    // runSurveySimulation_Resident(population, questions, system_prompt_template_for_Qwen,user_prompt_template, responseManager);
-    // //
-    // responseManager.printSummary();
-    // exportResultsToFiles(responseManager,population,questions,
-    //                        "../../results/individual_responses_bfi2_qwen.csv",
-    //                        "../../data/merged_population_responses_bfi2_qwen.csv");
+    IndividualResponseManager responseManager;
+    runSurveySimulation_Resident(merged_population, questions, system_prompt_template_for_Qwen,user_prompt_template, responseManager);
+    //
+    responseManager.printSummary();
+    exportResultsToFiles(responseManager,merged_population,questions,
+                           "../../results/individual_responses_bfi2_qwen_50.csv",
+                           "../../data/merged_population_responses_bfi2_qwen_50.csv");
 
     // コンフィグ設定
     ExperimentConfig config;
@@ -207,14 +208,23 @@ int main() {
     config.real_data_path = "../../data/real_ratios.csv"; // 作成した正解データ
     config.log_file_path = "../../log/sa_optimization.csv";
 
-    //実験開始
-    runOptimizationExperiment(
-        population,
-        questions,
-        system_prompt_templates_forQwen,
-        user_prompt_template,
-        config
-    );
+    // //実験開始
+    // runOptimizationExperiment(
+    //     population,
+    //     questions,
+    //     system_prompt_templates_forQwen,
+    //     user_prompt_template,
+    //     config
+    // );
+
+    // runOptimizationExperimentParallel(
+    //     population,
+    //     questions,
+    //     system_prompt_templates_forQwen,
+    //     user_prompt_template,
+    //     config
+    // );
+
 
 
 

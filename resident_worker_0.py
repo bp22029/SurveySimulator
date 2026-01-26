@@ -1,5 +1,5 @@
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 os.environ["VLLM_ENABLE_V1_MULTIPROCESSING"] = "0"
 
 os.environ['VLLM_DETERMINISTIC_OPS'] = '1'
@@ -17,7 +17,7 @@ import torch
 from vllm import LLM, SamplingParams
 
 # パス設定（あなたの環境に合わせてください）
-BRIDGE_DIR = "/home/bp22029/vllm_bridge"
+BRIDGE_DIR = "/home/bp22029/vllm_bridge_0"
 REQUEST_FILE = os.path.join(BRIDGE_DIR, "bridge_request.json")
 RESPONSE_FILE = os.path.join(BRIDGE_DIR, "bridge_response.json")
 
