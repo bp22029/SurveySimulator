@@ -174,22 +174,127 @@ void sendRequestAndReceiveResponse(
     }
 }
 
+// std::map<std::string, int> getResponsesForPerson(
+//     const Person& person,
+//     const std::vector<Question>& questions,
+//     const std::string& system_prompt_template,
+//     const std::string& user_prompt_template,
+//     const std::string& bridge_dir,
+//     std::ofstream* log_file
+// ) {
+//     std::map<std::string, int> responses_map;
+//     json requests = json::array();
+//
+//     // 1. リクエスト作成
+//     for (const auto& q : questions) {
+//         std::string sys_prompt = generatePrompt(system_prompt_template, person, q);
+//         std::string usr_prompt = generatePrompt(user_prompt_template, person, q);
+//
+//         // IDは "questionID" だけでOK（1人分なので）
+//         requests.push_back({
+//             {"id", q.id},
+//             {"system_prompt", sys_prompt},
+//             {"user_prompt", usr_prompt}
+//         });
+//     }
+//
+//     // 2. ファイル書き出し (bridge_request.json)
+//     // ※競合回避のため、一時ファイル経由での書き込みを推奨
+//     std::string temp_request_path = REQUEST_FILE + ".tmp";
+//     std::ofstream req_file(temp_request_path);
+//     if (!req_file.is_open()) {
+//         std::cerr << "Error: Cannot open request file." << std::endl;
+//         return responses_map; // 空のマップを返す
+//     }
+//     req_file << requests.dump();
+//     req_file.close();
+//     fs::rename(temp_request_path, REQUEST_FILE); // アトミックに移動
+//
+//     // 3. 応答待ち (ポーリング)
+//     // ※無限ループ防止のためタイムアウトを入れるのが安全です
+//     int timeout_ms = 300000; // 300秒
+//     int waited_ms = 0;
+//     while (!fs::exists(RESPONSE_FILE)) {
+//         std::this_thread::sleep_for(std::chrono::milliseconds(50));
+//         waited_ms += 50;
+//         if (waited_ms > timeout_ms) {
+//             std::cerr << "Timeout waiting for LLM response." << std::endl;
+//             return responses_map;
+//         }
+//     }
+//     // 書き込み完了待ち
+//     std::this_thread::sleep_for(std::chrono::milliseconds(50));
+//
+//     // 4. 結果読み込み
+//     std::ifstream res_file(RESPONSE_FILE);
+//     json responses_json;
+//     try {
+//         res_file >> responses_json;
+//     } catch (...) {
+//         std::cerr << "JSON Parse Error" << std::endl;
+//         res_file.close();
+//         fs::remove(RESPONSE_FILE); // 壊れたファイルは消す
+//         return responses_map;
+//     }
+//     res_file.close();
+//     fs::remove(RESPONSE_FILE); // 読み終わったら削除
+//
+//     // 5. マップに格納 (ここが重要)
+//     for (const auto& item : responses_json) {
+//         std::string q_id = item["id"];
+//         std::string full_response = item["response"];
+//
+//         // タグから数字を抽出
+//         int choice = extractAnswerFromTags(full_response);
+//
+//         // 有効な回答ならマップに追加
+//         if (choice != -1) {
+//             responses_map[q_id] = choice;
+//         }
+//         // 書き込み量が大量のため、コメントアウト
+//         // if (log_file && log_file->is_open()) {
+//         //     *log_file << "--------------------------------------------------\n";
+//         //     // SAの試行中であることを明示しておくと後で見やすいです
+//         //     *log_file << "[Optimization Trial] Agent ID: " << person.person_id << " | Question ID: " << q_id << "\n";
+//         //     *log_file << "Model: Qwen/Qwen3-14B | Seed: 42 | Temp: 0\n";
+//         //
+//         //     // 思考プロセスの抽出と記録
+//         //     std::string thinking = extractThinkLog(full_response);
+//         //     *log_file << "\n[Reasoning Content]\n" << thinking << "\n";
+//         //
+//         //     *log_file << "\n[Final Answer]\n" << choice << "\n";
+//         //     *log_file << "\n";
+//         //
+//         //     // SAは高速に回るため、頻繁なflushは遅延の原因になりますが、
+//         //     // デバッグ中は flush しておいた方が落ちた時にログが残ります。
+//         //     // log_file->flush();
+//         // }
+//     }
+//
+//
+//     return responses_map; // これが new_responses になる
+// }
+
 std::map<std::string, int> getResponsesForPerson(
     const Person& person,
     const std::vector<Question>& questions,
     const std::string& system_prompt_template,
     const std::string& user_prompt_template,
+    const std::string& bridge_dir, // この引数を使用します
     std::ofstream* log_file
 ) {
     std::map<std::string, int> responses_map;
     json requests = json::array();
+
+    // --- ここで引数の bridge_dir を使ってパスを生成します ---
+    std::string request_file = bridge_dir + "/bridge_request.json";
+    std::string response_file = bridge_dir + "/bridge_response.json";
 
     // 1. リクエスト作成
     for (const auto& q : questions) {
         std::string sys_prompt = generatePrompt(system_prompt_template, person, q);
         std::string usr_prompt = generatePrompt(user_prompt_template, person, q);
 
-        // IDは "questionID" だけでOK（1人分なので）
         requests.push_back({
             {"id", q.id},
             {"system_prompt", sys_prompt},
@@ -197,56 +302,52 @@ std::map<std::string, int> getResponsesForPerson(
         });
     }
 
-    // 2. ファイル書き出し (bridge_request.json)
-    // ※競合回避のため、一時ファイル経由での書き込みを推奨
-    std::string temp_request_path = REQUEST_FILE + ".tmp";
+    // 2. ファイル書き出し
+    // REQUEST_FILE ではなくローカル変数の request_file を使用
+    std::string temp_request_path = request_file + ".tmp";
     std::ofstream req_file(temp_request_path);
     if (!req_file.is_open()) {
-        std::cerr << "Error: Cannot open request file." << std::endl;
-        return responses_map; // 空のマップを返す
+        std::cerr << "Error: Cannot open request file: " << temp_request_path << std::endl;
+        return responses_map;
     }
     req_file << requests.dump();
     req_file.close();
-    fs::rename(temp_request_path, REQUEST_FILE); // アトミックに移動
+    fs::rename(temp_request_path, request_file); // request_file を使用
 
     // 3. 応答待ち (ポーリング)
-    // ※無限ループ防止のためタイムアウトを入れるのが安全です
-    int timeout_ms = 300000; // 300秒
+    int timeout_ms = 300000;
     int waited_ms = 0;
-    while (!fs::exists(RESPONSE_FILE)) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(50));
-        waited_ms += 50;
+    // RESPONSE_FILE ではなくローカル変数の response_file を使用
+    while (!fs::exists(response_file)) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        waited_ms += 500;
         if (waited_ms > timeout_ms) {
-            std::cerr << "Timeout waiting for LLM response." << std::endl;
+            std::cerr << "Timeout waiting for LLM response in: " << bridge_dir << std::endl;
             return responses_map;
         }
     }
-    // 書き込み完了待ち
-    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
     // 4. 結果読み込み
-    std::ifstream res_file(RESPONSE_FILE);
+    // response_file を使用
+    std::ifstream res_file(response_file);
     json responses_json;
     try {
         res_file >> responses_json;
     } catch (...) {
-        std::cerr << "JSON Parse Error" << std::endl;
+        std::cerr << "JSON Parse Error in: " << response_file << std::endl;
         res_file.close();
-        fs::remove(RESPONSE_FILE); // 壊れたファイルは消す
+        if (fs::exists(response_file)) fs::remove(response_file);
         return responses_map;
     }
     res_file.close();
-    fs::remove(RESPONSE_FILE); // 読み終わったら削除
+    if (fs::exists(response_file)) fs::remove(response_file); // 読み終わったら削除
 
-    // 5. マップに格納 (ここが重要)
+    // 5. マップに格納
     for (const auto& item : responses_json) {
         std::string q_id = item["id"];
         std::string full_response = item["response"];
-
-        // タグから数字を抽出
         int choice = extractAnswerFromTags(full_response);
-
-        // 有効な回答ならマップに追加
         if (choice != -1) {
             responses_map[q_id] = choice;
         }
@@ -270,6 +371,5 @@ std::map<std::string, int> getResponsesForPerson(
         // }
     }
 
-
-    return responses_map; // これが new_responses になる
+    return responses_map;
 }

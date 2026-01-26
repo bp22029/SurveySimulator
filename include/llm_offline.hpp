@@ -37,6 +37,7 @@ std::map<std::string, int> getResponsesForPerson(
     const std::vector<Question>& questions,
     const std::string& system_prompt_template,
     const std::string& user_prompt_template,
+    const std::string& bridge_dir,
     std::ofstream* log_file = nullptr
 );
 

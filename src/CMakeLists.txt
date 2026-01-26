@@ -34,6 +34,8 @@ add_library(SurveySimulatorLib STATIC
         ../include/optimization_manager.hpp
         ../include/experiment_runner.hpp
         experiment_runner.cpp
+        experiment_runner_parallel.cpp
+        ../include/experiment_runner_parallel.hpp
 
 )
 
