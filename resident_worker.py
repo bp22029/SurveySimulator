@@ -2,7 +2,7 @@ import os
 os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 os.environ["VLLM_ENABLE_V1_MULTIPROCESSING"] = "0"
 
-os.environ['VLLM_DETERMINISTIC_OPS'] = '1'
+# os.environ['VLLM_DETERMINISTIC_OPS'] = '1'
 os.environ['CUBLAS_WORKSPACE_CONFIG'] = ':4096:8'
 os.environ['PYTHONHASHSEED'] = '42'
 
