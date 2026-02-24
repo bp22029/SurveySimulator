@@ -38,6 +38,24 @@ void optimizationWorker(
     const std::vector<std::string>& q_ids
 );
 
+void optimizationWorkerHttp(
+    int thread_id,
+    std::atomic<int>& global_iter,
+    int max_iterations,
+    std::vector<Person>& population,
+    const std::vector<Question>& questions,
+    const std::string& sys_tmpl,
+    const std::string& user_prompt_template,
+    const ExperimentConfig& config,
+    IndividualResponseManager& responseManager,
+    OptimizationManager& optManager,
+    double& current_mae,
+    double& temperature,
+    std::ofstream& main_log,
+    const std::vector<int>& agent_indices,
+    const std::vector<std::string>& q_ids
+) ;
+
 void runOptimizationExperimentParallel(
     std::vector<Person>& population,
     const std::vector<Question>& questions,
@@ -45,5 +63,13 @@ void runOptimizationExperimentParallel(
     const std::string& user_prompt_template,
     const ExperimentConfig& config
 );
+
+void runOptimizationExperimentParallelHttp(
+    std::vector<Person>& population,
+    const std::vector<Question>& questions,
+    const std::map<std::string, std::string>& prompt_templates,
+    const std::string& user_prompt_template,
+    const ExperimentConfig& config
+)
 
 #endif //SURVEYSIMULATOR_EXPERIMENT_RUNNER_PARALLEL_HPP

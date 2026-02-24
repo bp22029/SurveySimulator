@@ -419,15 +419,114 @@ static std::string sendHttpPost(const std::string& url, const std::string& json_
 }
 
 // HTTP版メイン関数
+// src/llm_offline.cpp
+
 void sendRequestAndReceiveResponseHttp(
     const Person& person,
     const std::vector<Question>& questions,
     const std::string& system_prompt_template,
     const std::string& user_prompt_template,
     IndividualResponseManager& responseManager,
+    std::ofstream* log_file,
+    int port,              // ヘッダでデフォルト値を指定しているので、ここでは値を書かない
+    const std::string& host
+) {
+    // 1. リクエストデータの作成
+    json requests = json::array();
+    for (const auto& q : questions) {
+        std::string sys_prompt = generatePrompt(system_prompt_template, person, q);
+        std::string usr_prompt = generatePrompt(user_prompt_template, person, q);
+        std::string id = std::to_string(person.person_id) + "_" + q.id;
+
+        requests.push_back({
+            {"id", id},
+            {"system_prompt", sys_prompt},
+            {"user_prompt", usr_prompt}
+        });
+    }
+
+    // 2. HTTP通信 (URLを動的に生成)
+    // 指定された host と port を使用します
+    std::string url = "http://" + host + ":" + std::to_string(port) + "/generate";
+
+    std::string request_json_str = requests.dump();
+
+    // sendHttpPost は既存のヘルパー関数を使用
+    std::string response_str = sendHttpPost(url, request_json_str);
+
+    if (response_str.empty()) {
+        std::cerr << "[C++] Error: Received empty response for Agent " << person.person_id
+                  << " from " << url << std::endl;
+        return;
+    }
+
+    // 3. JSONパース
+    json responses;
+    try {
+        responses = json::parse(response_str);
+    } catch (const json::parse_error& e) {
+        std::cerr << "[C++] JSON Parse Error: " << e.what() << std::endl;
+        std::cerr << "Raw response: " << response_str << std::endl; // デバッグ用
+        return;
+    }
+
+    // 4. 結果の記録
+    for (const auto& item : responses) {
+        // 安全に値を取得
+        if (!item.contains("id") || !item.contains("response")) continue;
+
+        std::string id_str = item["id"];
+        std::string full_response = item["response"];
+
+        size_t sep_pos = id_str.find('_');
+        if (sep_pos == std::string::npos) continue;
+
+        int p_id = 0;
+        try {
+            p_id = std::stoi(id_str.substr(0, sep_pos));
+        } catch (...) { continue; }
+
+        std::string q_id = id_str.substr(sep_pos + 1);
+
+        int choice = extractAnswerFromTags(full_response);
+        if (choice != -1) {
+            responseManager.recordResponse(p_id, q_id, choice);
+        }
+
+        // ログ出力
+        if (log_file && log_file->is_open()) {
+            *log_file << "--------------------------------------------------\n";
+            *log_file << "Agent ID: " << p_id << " | Question ID: " << q_id << "\n";
+
+            // 思考ログ抽出
+            std::string thinking = extractThinkLog(full_response);
+            if (!thinking.empty()) {
+                *log_file << "\n[Reasoning Content]\n" << thinking << "\n";
+            }
+
+            *log_file << "\n[Final Answer]\n" << choice << "\n\n";
+
+            // バッファフラッシュはコストが高いので、必要に応じてコメントアウト可
+            log_file->flush();
+        }
+    }
+}
+
+
+// 追加が必要な実装
+std::map<std::string, int> getResponsesForPersonHttp(
+    const Person& person,
+    const std::vector<Question>& questions,
+    const std::string& system_prompt_template,
+    const std::string& user_prompt_template,
+    const std::string& host,
+    int port,
     std::ofstream* log_file
 ) {
-    // 1. リクエストデータの作成 (既存ロジックと同じ)
+    // 1. URL作成
+    std::string url = "http://" + host + ":" + std::to_string(port) + "/generate";
+
+    // 2. リクエストJSON作成
     json requests = json::array();
     for (const auto& q : questions) {
         std::string sys_prompt = generatePrompt(system_prompt_template, person, q);
@@ -440,50 +539,35 @@ void sendRequestAndReceiveResponseHttp(
         });
     }
 
-    // 2. HTTP通信
-    // ポート8000は server.py の設定に合わせてください
-    std::string url = "http://127.0.0.1:8000/generate";
+    // 3. 送信 (sendHttpPost は既存のものを利用)
     std::string request_json_str = requests.dump();
     std::string response_str = sendHttpPost(url, request_json_str);
 
+    // 4. パースして map に詰める
+    std::map<std::string, int> result_map;
     if (response_str.empty()) {
-        std::cerr << "[C++] Error: Received empty response for Agent " << person.person_id << std::endl;
-        return;
+        std::cerr << "[C++] Error: Empty response from " << url << std::endl;
+        return result_map;
     }
 
-    // 3. JSONパース
-    json responses;
     try {
-        responses = json::parse(response_str);
+        json responses = json::parse(response_str);
+        for (const auto& item : responses) {
+            std::string id_str = item["id"];
+            std::string full_response = item["response"];
+
+            size_t sep_pos = id_str.find('_');
+            if (sep_pos != std::string::npos) {
+                std::string q_id = id_str.substr(sep_pos + 1);
+                int choice = extractAnswerFromTags(full_response);
+                if (choice != -1) {
+                    result_map[q_id] = choice;
+                }
+            }
+        }
     } catch (const json::parse_error& e) {
         std::cerr << "[C++] JSON Parse Error: " << e.what() << std::endl;
-        return;
     }
 
-    // 4. 結果の記録
-    for (const auto& item : responses) {
-        std::string id_str = item["id"];
-        std::string full_response = item["response"];
-
-        size_t sep_pos = id_str.find('_');
-        if (sep_pos == std::string::npos) continue;
-        int p_id = std::stoi(id_str.substr(0, sep_pos));
-        std::string q_id = id_str.substr(sep_pos + 1);
-
-        int choice = extractAnswerFromTags(full_response);
-        if (choice != -1) {
-            responseManager.recordResponse(p_id, q_id, choice);
-        }
-
-        // ログ出力
-        if (log_file && log_file->is_open()) {
-            *log_file << "--------------------------------------------------\n";
-            *log_file << "Agent ID: " << p_id << " | Question ID: " << q_id << "\n";
-            // 思考ログ抽出用の関数などは既存のものを再利用
-             std::string thinking = extractThinkLog(full_response);
-             *log_file << "\n[Reasoning Content]\n" << thinking << "\n";
-            *log_file << "\n[Final Answer]\n" << choice << "\n\n";
-            log_file->flush();
-        }
-    }
+    return result_map;
 }
