@@ -72,4 +72,12 @@ void verificationReproducibility(const std::vector<Person>& population,
                                 const std::map<std::string, std::string>& prompt_templates,
                                 const std::string& user_prompt_template);
 
+void runSurveySimulation_ResidentHttp(
+    const std::vector<Person>& population,
+    const std::vector<Question>& questions,
+    const std::string& system_prompt_template,
+    const std::string& user_prompt_template,
+    IndividualResponseManager& responseManager
+);
+
 #endif // SIMULATION_RUNNER_HPP

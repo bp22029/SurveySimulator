@@ -1,5 +1,4 @@
 # (1) ロジック部分をライブラリ "SurveySimulatorLib" として定義
-# main.cpp と ThreadSafeQueue.hpp (ヘッダオンリー) 以外をリストアップ
 add_library(SurveySimulatorLib STATIC
         data_loader.cpp
         prompt_generator.cpp
@@ -13,8 +12,10 @@ add_library(SurveySimulatorLib STATIC
         llm_offline.cpp
         csv_comparer.cpp
         optimization_manager.cpp
+        experiment_runner.cpp
+        experiment_runner_parallel.cpp
 
-        # ヘッダファイルも追加 (includeディレクトリへのパスは (3) で指定)
+        # ヘッダファイル
         ../include/data_loader.hpp
         ../include/prompt_generator.hpp
         ../include/llm_client.hpp
@@ -33,10 +34,7 @@ add_library(SurveySimulatorLib STATIC
         ../include/globals.hpp
         ../include/optimization_manager.hpp
         ../include/experiment_runner.hpp
-        experiment_runner.cpp
-        experiment_runner_parallel.cpp
         ../include/experiment_runner_parallel.hpp
-
 )
 
 # (2) メインの実行ファイル "SurveySimulator" を定義
@@ -44,16 +42,23 @@ add_executable(SurveySimulator
         main.cpp
 )
 
-# (3) 各ターゲットに必要なインクルードパスとリンクを指定
+# (3) CURLパッケージの検索
+find_package(CURL REQUIRED)
 
-# SurveySimulatorLib が必要とするライブラリ
+# (4) インクルードディレクトリの設定
 target_include_directories(SurveySimulatorLib PUBLIC
-        ../include                      # 自分のヘッダ
-        ${httplib_SOURCE_DIR}           # httplibのヘッダ
-        ${json_SOURCE_DIR}/include      # jsonのヘッダ
+        ../include
+        ${httplib_SOURCE_DIR}
+        ${json_SOURCE_DIR}/include
+        ${CURL_INCLUDE_DIRS}
 )
 
-# SurveySimulator（実行ファイル） が必要とするライブラリ
+# (5) ★ここが重要: SurveySimulatorLib に CURL をリンクする
+target_link_libraries(SurveySimulatorLib PUBLIC
+        ${CURL_LIBRARIES}
+)
+
+# (6) 実行ファイルは自作ライブラリをリンクするだけでOK
 target_link_libraries(SurveySimulator PRIVATE
-        SurveySimulatorLib              # (1)で定義した自作ライブラリ
+        SurveySimulatorLib
 )

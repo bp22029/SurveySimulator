@@ -12,6 +12,7 @@
 #include <regex>
 #include "nlohmann/json.hpp"
 #include <string>
+#include <curl/curl.h>
 namespace fs = std::filesystem;
 using json = nlohmann::json;
 #include "../include/prompt_generator.hpp"
@@ -372,4 +373,117 @@ std::map<std::string, int> getResponsesForPerson(
     }
 
     return responses_map;
+}
+
+// ==========================================
+// HTTP版
+// ==========================================
+
+// ヘルパー関数: レスポンス書き込み用コールバック
+static size_t WriteCallback(void* contents, size_t size, size_t nmemb, std::string* userp) {
+    size_t totalSize = size * nmemb;
+    userp->append((char*)contents, totalSize);
+    return totalSize;
+}
+
+// ヘルパー関数: POST送信
+static std::string sendHttpPost(const std::string& url, const std::string& json_data) {
+    CURL* curl;
+    CURLcode res;
+    std::string readBuffer;
+
+    curl = curl_easy_init();
+    if(curl) {
+        struct curl_slist* headers = NULL;
+        headers = curl_slist_append(headers, "Content-Type: application/json");
+
+        // タイムアウト設定 (300秒)
+        curl_easy_setopt(curl, CURLOPT_TIMEOUT, 300L);
+        curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+        curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+        curl_easy_setopt(curl, CURLOPT_POST, 1L);
+        curl_easy_setopt(curl, CURLOPT_POSTFIELDS, json_data.c_str());
+        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
+        curl_easy_setopt(curl, CURLOPT_WRITEDATA, &readBuffer);
+
+        res = curl_easy_perform(curl);
+        if(res != CURLE_OK) {
+            std::cerr << "[C++] curl_easy_perform() failed: " << curl_easy_strerror(res) << std::endl;
+        }
+        curl_easy_cleanup(curl);
+        curl_slist_free_all(headers);
+    } else {
+        std::cerr << "[C++] Error: Failed to init curl." << std::endl;
+    }
+    return readBuffer;
+}
+
+// HTTP版メイン関数
+void sendRequestAndReceiveResponseHttp(
+    const Person& person,
+    const std::vector<Question>& questions,
+    const std::string& system_prompt_template,
+    const std::string& user_prompt_template,
+    IndividualResponseManager& responseManager,
+    std::ofstream* log_file
+) {
+    // 1. リクエストデータの作成 (既存ロジックと同じ)
+    json requests = json::array();
+    for (const auto& q : questions) {
+        std::string sys_prompt = generatePrompt(system_prompt_template, person, q);
+        std::string usr_prompt = generatePrompt(user_prompt_template, person, q);
+        std::string id = std::to_string(person.person_id) + "_" + q.id;
+        requests.push_back({
+            {"id", id},
+            {"system_prompt", sys_prompt},
+            {"user_prompt", usr_prompt}
+        });
+    }
+
+    // 2. HTTP通信
+    // ポート8000は server.py の設定に合わせてください
+    std::string url = "http://127.0.0.1:8000/generate";
+    std::string request_json_str = requests.dump();
+    std::string response_str = sendHttpPost(url, request_json_str);
+
+    if (response_str.empty()) {
+        std::cerr << "[C++] Error: Received empty response for Agent " << person.person_id << std::endl;
+        return;
+    }
+
+    // 3. JSONパース
+    json responses;
+    try {
+        responses = json::parse(response_str);
+    } catch (const json::parse_error& e) {
+        std::cerr << "[C++] JSON Parse Error: " << e.what() << std::endl;
+        return;
+    }
+
+    // 4. 結果の記録
+    for (const auto& item : responses) {
+        std::string id_str = item["id"];
+        std::string full_response = item["response"];
+
+        size_t sep_pos = id_str.find('_');
+        if (sep_pos == std::string::npos) continue;
+        int p_id = std::stoi(id_str.substr(0, sep_pos));
+        std::string q_id = id_str.substr(sep_pos + 1);
+
+        int choice = extractAnswerFromTags(full_response);
+        if (choice != -1) {
+            responseManager.recordResponse(p_id, q_id, choice);
+        }
+
+        // ログ出力
+        if (log_file && log_file->is_open()) {
+            *log_file << "--------------------------------------------------\n";
+            *log_file << "Agent ID: " << p_id << " | Question ID: " << q_id << "\n";
+            // 思考ログ抽出用の関数などは既存のものを再利用
+             std::string thinking = extractThinkLog(full_response);
+             *log_file << "\n[Reasoning Content]\n" << thinking << "\n";
+            *log_file << "\n[Final Answer]\n" << choice << "\n\n";
+            log_file->flush();
+        }
+    }
 }

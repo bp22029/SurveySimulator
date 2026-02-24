@@ -756,3 +756,47 @@ void verificationReproducibility(const std::vector<Person>& population,
 
 
 }
+
+// ==========================================
+// HTTP版
+// ==========================================
+void runSurveySimulation_ResidentHttp(
+    const std::vector<Person>& population,
+    const std::vector<Question>& questions,
+    const std::string& system_prompt_template,
+    const std::string& user_prompt_template,
+    IndividualResponseManager& responseManager
+) {
+    // ログディレクトリの準備
+    std::string log_dir = "../../log/";
+    if (!fs::exists(log_dir)) {
+        fs::create_directories(log_dir);
+    }
+
+    time_t now = time(0);
+    tm* ltm = localtime(&now);
+    char timestamp[20];
+    strftime(timestamp, sizeof(timestamp), "%Y%m%d_%H%M%S", ltm);
+    std::string log_filename = log_dir + "log_experiment_http_" + timestamp + ".txt";
+    std::ofstream log_file(log_filename);
+
+    int count = 0;
+    for (const auto& person : population) {
+        count++;
+        std::cout << "[C++ HTTP] Processing Agent " << count << "/" << population.size()
+                  << " (ID: " << person.person_id << ")..." << std::endl;
+
+        // ★HTTP版の関数を呼び出す
+        sendRequestAndReceiveResponseHttp(
+            person,
+            questions,
+            system_prompt_template,
+            user_prompt_template,
+            responseManager,
+            &log_file
+        );
+    }
+
+    if (log_file.is_open()) log_file.close();
+    std::cout << "[C++ HTTP] Simulation Completed." << std::endl;
+}
