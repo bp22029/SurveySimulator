@@ -70,6 +70,6 @@ void runOptimizationExperimentParallelHttp(
     const std::map<std::string, std::string>& prompt_templates,
     const std::string& user_prompt_template,
     const ExperimentConfig& config
-)
+);
 
 #endif //SURVEYSIMULATOR_EXPERIMENT_RUNNER_PARALLEL_HPP
