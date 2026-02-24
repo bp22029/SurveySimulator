@@ -186,20 +186,26 @@ int main() {
     // std::cout << "--------------------------------------------------" << std::endl;
     // std::cout << "All comparisons finished of main files." << std::endl;
 
-    // std::string model_name = "gemma-3-27b-it";//適宜変更
-    //
-    // IndividualResponseManager responseManager;
-    // OptimizationManager optManager;
-    // runSurveySimulation_Resident(merged_population, questions, system_prompt_template_for_Qwen,user_prompt_template, responseManager);
-    //
-    // responseManager.printSummary();
-    // exportResultsToFiles(responseManager,merged_population,questions,
-    //                        "../../results/individual_responses_bfi2_"+ model_name +".csv",
-    //                        "../../data/merged_population_responses_bfi2_" + model_name +".csv");
+    std::string model_name = "qwen3-14b";//適宜変更
+
+    IndividualResponseManager responseManager;
+    OptimizationManager optManager;
+    //runSurveySimulation_Resident(merged_population, questions, system_prompt_template_for_Qwen,user_prompt_template, responseManager);
+    runSurveySimulation_ResidentHttp(
+        population,
+        questions,
+        system_prompt_template_for_Qwen,
+        user_prompt_template,
+        responseManager
+    );
+    responseManager.printSummary();
+    exportResultsToFiles(responseManager,merged_population,questions,
+                           "../../results/individual_responses_bfi2_"+ model_name +".csv",
+                           "../../data/merged_population_responses_bfi2_" + model_name +".csv");
 
     // 集計と初期MAE計算
-    // std::vector<std::string> q_ids;
-    // for(const auto& q : questions) q_ids.push_back(q.id);
+    std::vector<std::string> q_ids;
+    for(const auto& q : questions) q_ids.push_back(q.id);
 
 
     // std::string mergerd_csv_path = "../../data/merged_population_responses_bfi2_gemma-3-12b-it.csv";
@@ -208,22 +214,24 @@ int main() {
     // mae_population = readPopulationFromMergedCSV(mergerd_csv_path);
     //
     //
-    // if (optManager.loadRealData("../../data/real_ratios.csv") == false) {
-    //     std::cerr << "Error: Could not load real data for MAE calculation." << std::endl;
-    //     return 1;
-    // }
-    // optManager.initializeCounts(responseManager, merged_population.size(), q_ids);
-    // //double mae = optManager.getCurrentTotalMAE();
-    // double mae = optManager.getCurrentTotalMAE();
-    // std::cout << mae << std::endl;
-    // //初期MAEをファイルに書き出し
-    // std::ofstream mae_file("../../log/initial_mae_" + model_name + ".txt");
-    // if (mae_file.is_open()) {
-    //     mae_file << "Initial MAE: " << mae << std::endl;
-    //     mae_file.close();
-    // } else {
-    //     std::cerr << "Error: Could not open MAE log file." << std::endl;
-    // }
+    if (optManager.loadRealData("../../data/real_ratios.csv") == false) {
+        std::cerr << "Error: Could not load real data for MAE calculation." << std::endl;
+        return 1;
+    }
+    optManager.initializeCounts(responseManager, merged_population.size(), q_ids);
+    //double mae = optManager.getCurrentTotalMAE();
+    double mae = optManager.getCurrentTotalMAE();
+    std::cout << mae << std::endl;
+    //初期MAEをファイルに書き出し
+    std::ofstream mae_file("../../log/initial_mae_" + model_name + ".txt");
+    if (mae_file.is_open()) {
+        mae_file << "Initial MAE: " << mae << std::endl;
+        mae_file.close();
+    } else {
+        std::cerr << "Error: Could not open MAE log file." << std::endl;
+    }
+
+
 
     // コンフィグ設定
     ExperimentConfig config;
@@ -256,6 +264,21 @@ int main() {
     //     config
     // );
 
+
+    // if (!population.empty()) {
+    //     std::cout << "!!! TEST MODE: Resizing population to 1 for HTTP test !!!" << std::endl;
+    //     population.resize(1);
+    // }
+    //
+    // std::cout << "Starting HTTP Simulation..." << std::endl;
+    //
+    // runSurveySimulation_ResidentHttp(
+    //     population,
+    //     questions,
+    //     system_prompt_template_for_Qwen,
+    //     user_prompt_template,
+    //     responseManager
+    // );
 
 
 

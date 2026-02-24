@@ -31,6 +31,15 @@ void sendRequestAndReceiveResponse(
     std::ofstream* log_file // ログ出力しない場合は nullptr
 );
 
+void sendRequestAndReceiveResponseHttp(
+    const Person& person,
+    const std::vector<Question>& questions,
+    const std::string& system_prompt_template,
+    const std::string& user_prompt_template,
+    IndividualResponseManager& responseManager,
+    std::ofstream* log_file
+);
+
 // 追加: 1人分の推論を行い、結果をマップで返す関数
 std::map<std::string, int> getResponsesForPerson(
     const Person& person,
