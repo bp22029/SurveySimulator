@@ -8,8 +8,9 @@ import time
 import random
 import numpy as np
 import torch
+import argparse
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+# os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 os.environ["VLLM_ENABLE_V1_MULTIPROCESSING"] = "0"
 
 os.environ['CUBLAS_WORKSPACE_CONFIG'] = ':4096:8'
@@ -28,6 +29,10 @@ def set_seed(seed=42):
 
 print(">>> Setting seed...")
 set_seed(42)
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--port", type=int, default=8000, help="Port to run the server on")
+args = parser.parse_args()
 
 # ★ここで既存のLLMクラス（オフラインエンジン）を初期化
 print("Loading model...")
@@ -88,4 +93,5 @@ async def generate_response(request: Request):
 
 if __name__ == "__main__":
     # サーバーを起動
-    uvicorn.run(app, host="127.0.0.1", port=8000)
+    print(f"Starting server on port {args.port}...")
+    uvicorn.run(app, host="127.0.0.1", port=args.port)

@@ -15,5 +15,5 @@ conda activate vllm_lab
 #    --reload オプションをつけておくと、Pythonコード変更時に自動再起動して便利です
 #    hostは WSL2/Ubuntu 内での通信なら 127.0.0.1 でOK
 echo "Starting vLLM FastAPI Server..."
-python server.py
+CUDA_VISIBLE_DEVICES=1 python server.py --port 8000 > server_0.log 2>&1 &
 # または uvicorn server:app --host 127.0.0.1 --port 8000 --reload
