@@ -191,45 +191,45 @@ int main() {
     IndividualResponseManager responseManager;
     OptimizationManager optManager;
     //runSurveySimulation_Resident(merged_population, questions, system_prompt_template_for_Qwen,user_prompt_template, responseManager);
-    runSurveySimulation_ResidentHttp(
-        population,
-        questions,
-        system_prompt_template_for_Qwen,
-        user_prompt_template,
-        responseManager
-    );
-    responseManager.printSummary();
-    exportResultsToFiles(responseManager,merged_population,questions,
-                           "../../results/individual_responses_bfi2_"+ model_name +".csv",
-                           "../../data/merged_population_responses_bfi2_" + model_name +".csv");
-
-    // 集計と初期MAE計算
-    std::vector<std::string> q_ids;
-    for(const auto& q : questions) q_ids.push_back(q.id);
-
-
-    // std::string mergerd_csv_path = "../../data/merged_population_responses_bfi2_gemma-3-12b-it.csv";
-    // loadResponsesFromMergedCSV(mergerd_csv_path, responseManager, questions);
-    // std::vector<Person> mae_population;
-    // mae_population = readPopulationFromMergedCSV(mergerd_csv_path);
+    // runSurveySimulation_ResidentHttp(
+    //     population,
+    //     questions,
+    //     system_prompt_template_for_Qwen,
+    //     user_prompt_template,
+    //     responseManager
+    // );
+    // responseManager.printSummary();
+    // exportResultsToFiles(responseManager,merged_population,questions,
+    //                        "../../results/individual_responses_bfi2_"+ model_name +".csv",
+    //                        "../../data/merged_population_responses_bfi2_" + model_name +".csv");
+    //
+    // // 集計と初期MAE計算
+    // std::vector<std::string> q_ids;
+    // for(const auto& q : questions) q_ids.push_back(q.id);
     //
     //
-    if (optManager.loadRealData("../../data/real_ratios.csv") == false) {
-        std::cerr << "Error: Could not load real data for MAE calculation." << std::endl;
-        return 1;
-    }
-    optManager.initializeCounts(responseManager, merged_population.size(), q_ids);
-    //double mae = optManager.getCurrentTotalMAE();
-    double mae = optManager.getCurrentTotalMAE();
-    std::cout << mae << std::endl;
-    //初期MAEをファイルに書き出し
-    std::ofstream mae_file("../../log/initial_mae_" + model_name + ".txt");
-    if (mae_file.is_open()) {
-        mae_file << "Initial MAE: " << mae << std::endl;
-        mae_file.close();
-    } else {
-        std::cerr << "Error: Could not open MAE log file." << std::endl;
-    }
+    // // std::string mergerd_csv_path = "../../data/merged_population_responses_bfi2_gemma-3-12b-it.csv";
+    // // loadResponsesFromMergedCSV(mergerd_csv_path, responseManager, questions);
+    // // std::vector<Person> mae_population;
+    // // mae_population = readPopulationFromMergedCSV(mergerd_csv_path);
+    // //
+    // //
+    // if (optManager.loadRealData("../../data/real_ratios.csv") == false) {
+    //     std::cerr << "Error: Could not load real data for MAE calculation." << std::endl;
+    //     return 1;
+    // }
+    // optManager.initializeCounts(responseManager, merged_population.size(), q_ids);
+    // //double mae = optManager.getCurrentTotalMAE();
+    // double mae = optManager.getCurrentTotalMAE();
+    // std::cout << mae << std::endl;
+    // //初期MAEをファイルに書き出し
+    // std::ofstream mae_file("../../log/initial_mae_" + model_name + ".txt");
+    // if (mae_file.is_open()) {
+    //     mae_file << "Initial MAE: " << mae << std::endl;
+    //     mae_file.close();
+    // } else {
+    //     std::cerr << "Error: Could not open MAE log file." << std::endl;
+    // }
 
 
 
@@ -256,13 +256,13 @@ int main() {
     //     config
     // );
 
-    // runOptimizationExperimentParallel(
-    //     population,
-    //     questions,
-    //     system_prompt_templates_forQwen,
-    //     user_prompt_template,
-    //     config
-    // );
+    runOptimizationExperimentParallelHttp(
+        population,
+        questions,
+        system_prompt_templates_forQwen,
+        user_prompt_template,
+        config
+    );
 
 
     // if (!population.empty()) {

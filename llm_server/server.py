@@ -15,6 +15,7 @@ os.environ["VLLM_ENABLE_V1_MULTIPROCESSING"] = "0"
 
 os.environ['CUBLAS_WORKSPACE_CONFIG'] = ':4096:8'
 os.environ['PYTHONHASHSEED'] = '42'
+os.environ["VLLM_BATCH_INVARIANT"] = "1"
 
 #os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
