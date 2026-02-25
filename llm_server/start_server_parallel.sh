@@ -21,7 +21,7 @@ CUDA_VISIBLE_DEVICES=1 python server.py --port 8001 > server_1.log 2>&1 &
 
 echo "Servers actvated on ports 8000 and 8001."
 
-echo "Servers activated. Press Ctrl+C to stop."
+echo "Servers activated."
 
 # スクリプトが終了しないように待機
 wait

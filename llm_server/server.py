@@ -1,6 +1,7 @@
-# 必要なライブラリのインポート
 from fastapi import FastAPI, Request
 from vllm import LLM, SamplingParams
+from pydantic import BaseModel 
+from typing import List
 import uvicorn
 import os
 
@@ -21,6 +22,11 @@ os.environ["VLLM_BATCH_INVARIANT"] = "1"
 
 
 app = FastAPI()
+
+class PromptRequest(BaseModel):
+    id: int
+    system_prompt: str
+    user_prompt: str
 
 def set_seed(seed=42):
     random.seed(seed)
@@ -59,29 +65,29 @@ sampling_params = SamplingParams(
 
 print(">>> Server is ready.")
 @app.post("/generate")
-async def generate_response(request: Request):
-    # 1. HTTPリクエストからJSONデータを受け取る
-    data = await request.json()
-
-    # 2. 既存コードと同じ前処理
+async def generate_response(data: List[PromptRequest]):
+    # data はもう辞書(dict)ではなく、オブジェクトのリストになっています
     prompts = []
     ids = []
+    
     for item in data:
+        # ★ 辞書アクセス item["key"] ではなく、ドットアクセス item.key に変わります！
         messages = [
-            {"role": "system", "content": item["system_prompt"]},
-            {"role": "user", "content": item["user_prompt"]},
+            {"role": "system", "content": item.system_prompt},
+            {"role": "user", "content": item.user_prompt},
         ]
+        
+        # テンプレート適用 (tokenizerなどの変数はグローバルにある前提)
         formatted_prompt = tokenizer.apply_chat_template(
             messages, tokenize=False, add_generation_prompt=True
         )
         prompts.append(formatted_prompt)
-        ids.append(item["id"])
+        ids.append(item.id)
 
-    # 3. ★既存と同じ「バッチ推論」を実行★
-    # リストで渡しているので、vLLMはこれをバッチとして処理します
+    # 推論実行
     outputs = llm.generate(prompts, sampling_params)
 
-    # 4. 結果の整形
+    # 結果の整形
     results = []
     for i, output in enumerate(outputs):
         results.append({
@@ -89,7 +95,6 @@ async def generate_response(request: Request):
             "response": output.outputs[0].text
         })
 
-    # 5. レスポンスを返す
     return results
 
 if __name__ == "__main__":
