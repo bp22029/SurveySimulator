@@ -9,6 +9,8 @@ pkill -f "python server.py" || true
 
 echo "Starting vLLM Servers..."
 
+trap "echo 'Stopping servers...'; pkill -f 'python server.py'; exit" INT TERM
+
 # --- 1台目: GPU 0, Port 8000 ---
 # CUDA_VISIBLE_DEVICES環境変数をコマンドの頭につけて渡します
 # & をつけることでバックグラウンド実行にします
@@ -19,5 +21,7 @@ CUDA_VISIBLE_DEVICES=1 python server.py --port 8001 > server_1.log 2>&1 &
 
 echo "Servers actvated on ports 8000 and 8001."
 
-# スクリプトが終了しないように待機（これがないとDockerなどで即終了してしまいます）
+echo "Servers activated. Press Ctrl+C to stop."
+
+# スクリプトが終了しないように待機
 wait

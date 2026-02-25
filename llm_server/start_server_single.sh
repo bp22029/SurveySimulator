@@ -8,7 +8,7 @@ set -e
 source /home/bp22029/miniconda3/etc/profile.d/conda.sh
 # または source ~/miniconda3/etc/profile.d/conda.sh
 
-# 2. 仮想環境のアクティベート (例: vllm_env という名前の場合)
+# 2. 仮想環境のアクティベート
 conda activate vllm_lab
 
 # 3. サーバーの起動
