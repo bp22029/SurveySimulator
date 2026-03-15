@@ -17,6 +17,7 @@ std::string readPromptTemplate(const std::string& template_path) {
         template_file.close();
         return prompt_template;
     } else {
+        std::cerr << "テンプレートファイルを開けません: " << template_path << std::endl;
         return "";
     }
 }

@@ -1,0 +1,6 @@
+services:
+  simulator:
+    build: .
+    volumes:
+      - .:/app    # 手元のソースコードをコンテナの /app に同期
+    tty: true     # コンテナを自動終了させず、起動したまま待機させるおまじない

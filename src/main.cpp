@@ -94,6 +94,11 @@ int main() {
     std::vector<SurveyResult> results;
     initializeSurveyResults(results,questions);
 
+    std::string test_prompt = generatePrompt(system_prompt_template_for_Qwen, population[0], questions[0]);
+    std::cout << "Generated Prompt for Test Person 0 and Question 0:" << std::endl;
+    std::cout << "----------------------------------------" << std::endl;
+    std::cout << test_prompt << std::endl;
+    std::cout << "----------------------------------------" << std::endl;
 
 
     //検証用のシミュレーション　オフライン
@@ -256,13 +261,13 @@ int main() {
     //     config
     // );
 
-    runOptimizationExperimentParallelHttp(
-        population,
-        questions,
-        system_prompt_templates_forQwen,
-        user_prompt_template,
-        config
-    );
+    // runOptimizationExperimentParallelHttp(
+    //     population,
+    //     questions,
+    //     system_prompt_templates_forQwen,
+    //     user_prompt_template,
+    //     config
+    // );
 
 
     // if (!population.empty()) {
