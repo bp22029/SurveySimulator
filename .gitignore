@@ -13,3 +13,6 @@ log/
 results/
 build/
 cmake-build-*/
+data/verification_population.csv
+data/merged_population_responses.csv
+*:Zone.Identifier
