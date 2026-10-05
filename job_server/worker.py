@@ -53,7 +53,7 @@ class Worker(threading.Thread):
                     f"output count mismatch: {len(completions)} outputs for {len(requests)} requests"
                 )
             results = [
-                {"id": r["id"], "response": c.text, "finish_reason": c.finish_reason}
+                {"id": r["id"], "response": c.text, "finish_reason": c.finish_reason, "n_tokens": c.n_tokens}
                 for r, c in zip(requests, completions)
             ]
             done = self.store.complete(job_id, results)

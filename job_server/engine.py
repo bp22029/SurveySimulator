@@ -12,6 +12,7 @@ SEED = 42
 class Completion:
     text: str
     finish_reason: Optional[str]
+    n_tokens: int  # 出力のトークン数
 
 
 class VllmEngine:
@@ -73,7 +74,10 @@ class VllmEngine:
     def generate(self, pairs: Sequence[Tuple[str, str]]) -> List[Completion]:
         prompts = [self.format_prompt(s, u) for s, u in pairs]
         outputs = self.llm.generate(prompts, self.sampling_params)
-        return [Completion(o.outputs[0].text, o.outputs[0].finish_reason) for o in outputs]
+        return [
+            Completion(o.outputs[0].text, o.outputs[0].finish_reason, len(o.outputs[0].token_ids))
+            for o in outputs
+        ]
 
     def describe(self) -> dict:
         sp = self.sampling_params
@@ -88,9 +92,26 @@ class VllmEngine:
             "enable_thinking": True,
             "reasoning_effort": self.reasoning_effort,
             "kv_cache_tokens": self._kv_cache_tokens(),
+            # batch invariance が使えないので、同時に処理する本数を決める設定は出力に影響する。記録して比較する
+            "scheduler": self._config_fields(
+                "scheduler_config", ["max_num_seqs", "max_num_batched_tokens", "enable_chunked_prefill", "policy"]
+            ),
+            "cache": self._config_fields("cache_config", ["block_size", "num_gpu_blocks", "mamba_block_size"]),
             # チャットテンプレートの適用結果を残し、思考モードの扱いを起動ログで確認できるようにする
             "chat_template_sample": self.format_prompt("<SYSTEM>", "<USER>"),
         }
+
+    def _config_fields(self, config_name: str, fields: List[str]) -> dict:
+        # 内部属性の場所は vLLM のバージョンで変わるので、取れないものは None
+        try:
+            config = getattr(self.llm.llm_engine.vllm_config, config_name)
+        except Exception:
+            return {}
+        out = {}
+        for name in fields:
+            value = getattr(config, name, None)
+            out[name] = value if isinstance(value, (int, float, str, bool, type(None))) else str(value)
+        return out
 
     def _kv_cache_tokens(self) -> Optional[int]:
         # 内部属性の場所は vLLM のバージョンで変わるので、取れなければ None
@@ -108,7 +129,7 @@ class EchoEngine:
     revision = "none"
 
     def generate(self, pairs: Sequence[Tuple[str, str]]) -> List[Completion]:
-        return [Completion(f"<think>echo</think>\n<answer>1</answer>\n{u}", "stop") for _, u in pairs]
+        return [Completion(f"<think>echo</think>\n<answer>1</answer>\n{u}", "stop", len(u)) for _, u in pairs]
 
     def describe(self) -> dict:
         return {"engine": "echo"}

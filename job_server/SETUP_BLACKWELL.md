@@ -45,10 +45,16 @@ C++（BatchOptimizer）と検証用のプロンプト作成は実験用PC で行
 | 推奨サンプリング | 思考モードは temperature=1.0, top_p=0.95, top_k=20。本研究は再現性のため temperature=0 にする（設計書 §3.2）ので、`finish_reason == "length"` を監視する |
 | MTP | 投機的デコーディング用の層があるが、使わない（`speculative_config` を指定しない） |
 
-再現性に関わる未確認事項：
+再現性に関わる制約（2026-10-05 に確認）：
 
-- vLLM の batch invariance（`VLLM_BATCH_INVARIANT=1`）の公式な対応表に、線形注意（Gated DeltaNet）を持つモデルは載っていない。§10 の検証4で、効いているかを実測する
-- RTX Pro 6000（sm_120）は「compute capability 8.0 以上」という条件は満たすが、batch invariance の動作確認済み一覧には明記されていない
+- vLLM 0.30.0 は、このモデルの線形注意（GDN）で batch invariance に対応していない。`VLLM_BATCH_INVARIANT=1` では
+  `RuntimeError: VLLM batch_invariant mode is not supported for GDN_ATTN.` で起動しないため、`0` に固定している
+- そのため保証されるのは「同じバッチを同じ設定で流せば同じ結果」まで。同じジョブの繰り返し・他のクライアントとの交互利用・
+  再起動・クライアントの再開では同じ結果になる見込み（§10 の検証1〜3で実測）だが、ある人の回答は同じジョブの他の人の内容にも
+  わずかに左右されうる（検証4は不一致になる見込み）。論文にはこの性質を書く
+- 同時に処理する本数を決める設定（`GPU_MEMORY_UTILIZATION`・`MAX_TOKENS`・`MAX_MODEL_LEN`）も出力に影響するので、
+  検証の前に決めて以降は変えない。`GET /info` の `engine.scheduler`・`engine.cache` に記録され、`BatchOptimizer` は再開時に
+  これが変わっていたら止まる
 
 ---
 
@@ -247,7 +253,7 @@ uv run --no-project --with "transformers>=5.8" --with jinja2 python job_server/t
 
 | 値 | システムプロンプトへの追加 | 想定される影響 |
 |---|---|---|
-| `xhigh`（モデルの既定） | 先頭に "Reasoning effort is set to xhigh. Please think carefully..." | 思考が最も長い。`max_tokens=4096` で打ち切られる回答が増え、時間もかかる |
+| `xhigh`（モデルの既定） | 先頭に "Reasoning effort is set to xhigh. Please think carefully..." | 思考が最も長い。`MAX_TOKENS` で打ち切られる回答が増え、時間もかかる |
 | `medium` | なし（昨年と同じく、こちらのシステムプロンプトだけ） | 中間 |
 | `low` | 先頭に "Reasoning effort is set to low. Keep your thinking brief..." | 思考が最も短い |
 
@@ -289,7 +295,9 @@ pkill -INT -f "python server.py"
 - `server info:` の JSON に、vLLM・torch・transformers のバージョン、GPU、`model`・`revision`、
   `engine.reasoning_effort`、`engine.chat_template_sample` が出ている
 - `git` が `"source": "package"`、`"commit"` が送った一式の commit、`"dirty": false`
-- `kv_cache_tokens` に数値が出ている（`null` なら vLLM の内部の場所が変わっただけで、動作には影響しない）
+- `kv_cache_tokens`・`scheduler`（`max_num_seqs` など）・`cache`（`num_gpu_blocks` など）に数値が出ている
+  （`null` なら vLLM の内部の場所が変わっただけで、動作には影響しない）。起動のたびに同じ値になることを確認する
+  （他の人が GPU を使っていると推論用のメモリが減り、値が変わる）
 - 最後に `server is ready on 0.0.0.0:8000`
 - 環境変数が足りないと `environment variables are not set by the start script` で止まる
 
@@ -297,10 +305,24 @@ pkill -INT -f "python server.py"
 
 ```bash
 curl -s localhost:8000/queue
-curl -s localhost:8000/info | python -m json.tool | head -40
+curl -s localhost:8000/info | python3 -m json.tool | head -80
 ```
 
 止めるとき：tmux の中で `Ctrl-c`。実行中のジョブは、次の起動時に自動で再実行される。
+
+### 8.1 MAX_TOKENS を決める
+
+`MAX_TOKENS=8192` は仮の値。§10.1 で作る `requests.json` から5人分（255件）を流し、出力トークン数の分布を見て確定する。
+先に §9（実験用PC から 8000 番に届くこと）と §10.1（`requests.json`、`SERVER`・`V` の設定）を済ませておく：
+
+```bash
+$V submit --server $SERVER --requests requests.json --client-id tune --sweep 1 --persons 5 --out tune.json
+# 結果の最後に output tokens: mean / p50 / p90 / p99 / max と、各長さを超えた割合、finish_reason の内訳が出る
+```
+
+- `finish_reason` の `length`（打ち切り）がほとんどなく、p99 に十分な余裕がある値にする
+- 打ち切られた回答の多くが同じ文の繰り返し（温度0で起きやすい）なら、上げても改善しないので、それ以上は上げない
+- 決めた値は `start_server.sh` に書いて commit し、一式を送り直してから §10 の検証に進む（`MAX_MODEL_LEN` はプロンプト約0.7k＋`MAX_TOKENS` 以上）
 
 ---
 
@@ -395,9 +417,11 @@ $V submit --server $SERVER --requests requests.json --client-id verify --sweep 5
 $V compare r1.json r5.json
 ```
 
-- 一致する → batch invariance が効いている。バッチの大きさや組み合わせに結果が依存しない
-- 一致しない → 「同じバッチなら同じ結果」の保証しかない。一括方式では毎周 403人分を同じ並び（population の順）で
-  1ジョブにするので運用上は成り立つが、1人だけを再推論して結果を比べる、といった使い方はできない。設計書 §5 に結果を記録する
+batch invariance を使えない（§0）ので、一致しない見込み。どの程度食い違うか（`different` の件数、回答番号まで変わる件数）を
+記録する。一括方式では毎周 403人分を同じ並び（population の順）で1ジョブにするので運用上は成り立つが、
+1人だけを再推論して結果を比べる、といった使い方はできない。結果は設計書 §5 に記録する
+
+回答番号の違いは、`compare` の出力に表示される差分の箇所で確認する（思考の途中で分かれても、最終回答が同じことは多い）。
 
 ### 10.6 検証5：速度（と reasoning_effort の比較）
 
@@ -411,8 +435,6 @@ $V compare r1.json r5.json
     $V submit --server $SERVER --requests requests.json --client-id verify --sweep $((20+i)) --skip $i --persons 1 --out r_single_$i.json
   done
   ```
-- batch invariance の有無による速度差：`VLLM_BATCH_INVARIANT=0 REASONING_EFFORT=medium bash start_server.sh` で
-  起動し直し、`--client-id verify-bi0` として 10.2 と同じ20人分を流して `elapsed` を比べる（比べ終わったら通常どおり起動し直す）
 - reasoning_effort の比較（§7）：`REASONING_EFFORT=xhigh bash start_server.sh` などで起動し直し、
   `--client-id verify-xhigh` などとして20人分を流し、`n_length` と `elapsed` を比べる
 
@@ -423,7 +445,8 @@ $V compare r1.json r5.json
 ## 11. 本番の前に
 
 - [ ] `start_server.sh` の `REASONING_EFFORT` を決めて commit し、その commit の一式を送り直した（§2）
-- [ ] 起動時に上書き（`REASONING_EFFORT=...`、`VLLM_BATCH_INVARIANT=...`）をせずに起動した。`GET /info` の `git.dirty` が `false`
+- [ ] `MAX_TOKENS` を §8.1 で決め、`MAX_MODEL_LEN`・`GPU_MEMORY_UTILIZATION` と合わせて commit した（以降は変えない）
+- [ ] 起動時に上書き（`REASONING_EFFORT=...`）をせずに起動した。`GET /info` の `git.dirty` が `false`
 - [ ] §10 の検証1〜3が合格。検証4・5の結果を設計書 §5 に記録した
 - [ ] SA の初期温度・終了温度・周回数を決めた（設計書 §8）
 - [ ] 2人それぞれの設定ファイル（`config/batch_optimizer.example.json` をコピー）で、`client_id` と `run_dir` が別
@@ -446,8 +469,9 @@ docker compose run --rm simulator ./build/src/BatchOptimizer my_config.json
 | `model type qwen3_5 ... not recognized` | transformers が古い。`source ~/llmsrv/job_server/env.sh && uv pip install "transformers>=5.8.0"` |
 | `unexpected keyword argument 'language_model_only'` | その vLLM では使えない。手元で `engine.py` の `language_model_only=True` の行を外して commit し、一式を送り直す（画像エンコーダの分だけメモリを使う） |
 | 起動時に CUDA out of memory | `GPU_MEMORY_UTILIZATION` は上げすぎない（他の利用者がいないか `nvidia-smi` で確認）。`MAX_MODEL_LEN` を下げる前に相談する |
-| `VLLM_BATCH_INVARIANT=1` で起動時にエラー | このモデルの線形注意の部分が batch invariance に対応していない可能性。エラー全文を記録し、`VLLM_BATCH_INVARIANT=0` で検証1〜4を行う（設計書 §5-4 の「同じバッチなら同じ結果」での運用） |
-| `n_length` が多い | `MAX_TOKENS`（4096）で思考が打ち切られている。reasoning_effort を下げるか `MAX_TOKENS` を上げる（2人で合意のうえで） |
+| `VLLM batch_invariant mode is not supported for GDN_ATTN` | `VLLM_BATCH_INVARIANT=1` で起動した。このモデルでは使えないので `0` にする（`start_server.sh` は `0` に固定済み） |
+| `n_length` が多い | `MAX_TOKENS` で思考が打ち切られている。§8.1 で分布を見て、reasoning_effort を下げるか `MAX_TOKENS` を上げる（2人で合意のうえで。最適化の途中では変えない） |
+| 起動のたびに `engine.cache.num_gpu_blocks` が違う | 起動時に他のプロセスが GPU メモリを使っていた。`nvidia-smi` で確認し、空いているときに起動し直す |
 | `HTTP 409` | 同じ `client_id` と `sweep` で別の内容をすでに投げている。検証では `sweep` を変える |
 | `GET /info` の `git.dirty` が `true` | Blackwell 機の上で `~/llmsrv/job_server/` のファイルが書き換えられている（`modified` に一覧）。手元で直して一式を送り直す |
 

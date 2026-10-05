@@ -7,6 +7,9 @@
   # 2つの結果を比べる（共通する id の応答テキストが完全に一致するか）
   python verify.py compare r1.json r2.json
 
+  # 保存した結果の出力トークン数の分布
+  python verify.py stats r1.json
+
 client_id と sweep の組はジョブごとに一意なので、同じ入力を何度も推論するときは sweep を変える。
 """
 import argparse
@@ -75,9 +78,36 @@ def cmd_submit(args):
     elapsed = meta["finished_at"] - meta["started_at"]
     print(f"done: {len(body['results'])} results, n_length={body['n_length']}, "
           f"elapsed={elapsed:.1f}s ({elapsed / len(chosen):.1f}s/person)")
+    print_token_stats(body["results"])
     with open(args.out, "w", encoding="utf-8") as f:
         json.dump({"job": meta, "results": body["results"]}, f, ensure_ascii=False)
     print(f"saved to {args.out}")
+
+
+def print_token_stats(results):
+    """出力トークン数の分布（MAX_TOKENS を決める材料）。"""
+    tokens = sorted(r["n_tokens"] for r in results if r.get("n_tokens") is not None)
+    if not tokens:
+        print("no n_tokens in results")
+        return
+
+    def pct(p):
+        return tokens[min(len(tokens) - 1, int(p / 100 * len(tokens)))]
+
+    reasons = {}
+    for r in results:
+        reasons[r.get("finish_reason")] = reasons.get(r.get("finish_reason"), 0) + 1
+    print(f"output tokens: n={len(tokens)} mean={sum(tokens) / len(tokens):.0f} "
+          f"p50={pct(50)} p90={pct(90)} p99={pct(99)} max={tokens[-1]}")
+    for limit in (2048, 4096, 8192, 16384):
+        over = sum(1 for t in tokens if t > limit)
+        print(f"  > {limit:>5}: {over} ({over / len(tokens):.1%})")
+    print(f"finish_reason: {reasons}")
+
+
+def cmd_stats(args):
+    with open(args.file, encoding="utf-8") as f:
+        print_token_stats(json.load(f)["results"])
 
 
 def cmd_compare(args):
@@ -122,6 +152,10 @@ def main():
     c.add_argument("b")
     c.add_argument("--show", type=int, default=5)
     c.set_defaults(func=cmd_compare)
+
+    st = sub.add_parser("stats", help="保存した結果の出力トークン数の分布")
+    st.add_argument("file")
+    st.set_defaults(func=cmd_stats)
 
     args = p.parse_args()
     if args.command == "submit" and not args.no_wait and not args.out:

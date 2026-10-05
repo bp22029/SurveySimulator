@@ -15,8 +15,9 @@ REQUIRED_ENV = {
     "PYTHONHASHSEED": {"42"},
     "VLLM_ENABLE_V1_MULTIPROCESSING": {"0"},
     "CUBLAS_WORKSPACE_CONFIG": {":4096:8"},
-    # 採否は速度計測の後に決める（設計書 §8）。どちらでもよいが、明示的に設定されていること
-    "VLLM_BATCH_INVARIANT": {"0", "1"},
+    # vLLM 0.30.0 は Qwen3.8 の線形注意（GDN）で batch invariance に対応しておらず、1 では起動しない
+    # （"VLLM batch_invariant mode is not supported for GDN_ATTN"、2026-10-05）。0 を明示する
+    "VLLM_BATCH_INVARIANT": {"0"},
 }
 
 PACKAGES = ("vllm", "torch", "transformers", "fastapi", "uvicorn", "pydantic")

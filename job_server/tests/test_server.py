@@ -30,7 +30,7 @@ class RecordingEngine:
             self.fail_next = False
             raise RuntimeError("CUDA error (simulated)")
         return [
-            Completion(f"<think>t</think><answer>{u}</answer>", "length" if u == "long" else "stop")
+            Completion(f"<think>t</think><answer>{u}</answer>", "length" if u == "long" else "stop", len(u))
             for _, u in pairs
         ]
 
@@ -70,8 +70,8 @@ def test_submit_run_and_fetch(server):
     assert body["status"] == "done"
     assert (body["client_id"], body["sweep"], body["n_length"]) == ("bp22029", 1, 1)
     assert body["results"] == [
-        {"id": "0_dq2_1", "response": "<think>t</think><answer>1</answer>", "finish_reason": "stop"},
-        {"id": "1_dq2_1", "response": "<think>t</think><answer>long</answer>", "finish_reason": "length"},
+        {"id": "0_dq2_1", "response": "<think>t</think><answer>1</answer>", "finish_reason": "stop", "n_tokens": 1},
+        {"id": "1_dq2_1", "response": "<think>t</think><answer>long</answer>", "finish_reason": "length", "n_tokens": 4},
     ]
     assert engine.calls == [["1", "long"]]
 
