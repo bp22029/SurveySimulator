@@ -29,6 +29,11 @@ def test_package_contains_server_files_and_detects_edits(tmp_path, monkeypatch):
     state = source_state(code)
     assert state == {"source": "package", "commit": head, "dirty": False, "modified": []}
 
+    # コピペで改行コードや末尾の改行が変わっても、書き換えとはみなさない
+    worker = code / "worker.py"
+    worker.write_bytes(worker.read_bytes().replace(b"\n", b"\r\n") + b"\r\n\r\n")
+    assert source_state(code)["dirty"] is False
+
     (code / "engine.py").write_text("# edited on the server\n", encoding="utf-8")
     state = source_state(code)
     assert state["dirty"] is True

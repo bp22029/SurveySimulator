@@ -138,6 +138,11 @@ rm job_server_<commit>.tar.gz
 更新するとき：サーバーを止め、`rm -rf ~/llmsrv/job_server` してから新しい一式を `~/llmsrv` で展開する。
 `venv/`・`data/` などは別の場所なので消えない。
 
+変わったファイルだけをコピペで反映してもよい。その場合は、変わったファイルに加えて `SOURCE_COMMIT` と
+`MANIFEST.sha256` も新しい一式のものに置き換える（手元で `tar xzf` すれば中身を見られる）。
+改行コード（CRLF/LF）と末尾の改行の違いは照らし合わせのときに無視されるので、貼り付けで変わっても `dirty` にはならない。
+反映後、サーバーを起動し直して `GET /info` の `git.dirty` が `false` になっていることを確認する。
+
 **Blackwell 機の上でファイルを直接書き換えない。** 変更は手元で commit して一式を作り直す
 （直接書き換えると `dirty: true` になり、`BatchOptimizer` の記録からどの設定で動いたかを追えなくなる）。
 

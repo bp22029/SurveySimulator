@@ -33,6 +33,15 @@ FILES = [
 EXECUTABLE = {"start_server.sh"}
 
 
+def content_hash(data: bytes) -> str:
+    """改行コード（CRLF/LF）と末尾の改行の違いは無視したハッシュ。
+
+    Blackwell 機ではファイルをコピペで反映することもあるので、貼り付けで変わりやすい部分は比べない。
+    environment.py の source_state と同じ計算にすること。
+    """
+    return hashlib.sha256(data.replace(b"\r\n", b"\n").rstrip(b"\n")).hexdigest()
+
+
 def git(*args: str) -> bytes:
     return subprocess.run(["git", *args], check=True, capture_output=True).stdout
 
@@ -40,7 +49,7 @@ def git(*args: str) -> bytes:
 def build(commit: str, out_dir: Path) -> Path:
     full = git("rev-parse", "--verify", f"{commit}^{{commit}}").decode().strip()
     contents = {name: git("show", f"{full}:job_server/{name}") for name in FILES}
-    manifest = "".join(f"{hashlib.sha256(data).hexdigest()}  {name}\n" for name, data in contents.items())
+    manifest = "".join(f"{content_hash(data)}  {name}\n" for name, data in contents.items())
     contents["SOURCE_COMMIT"] = (full + "\n").encode()
     contents["MANIFEST.sha256"] = manifest.encode()
 

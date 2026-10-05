@@ -86,7 +86,9 @@ def source_state(code_dir: Path) -> dict:
             continue
         digest, name = line.split(None, 1)
         path = code_dir / name.strip()
-        if not path.exists() or hashlib.sha256(path.read_bytes()).hexdigest() != digest:
+        # 改行コードと末尾の改行の違いは無視する（tools/package.py の content_hash と同じ計算）
+        normalized = path.read_bytes().replace(b"\r\n", b"\n").rstrip(b"\n") if path.exists() else None
+        if normalized is None or hashlib.sha256(normalized).hexdigest() != digest:
             modified.append(name.strip())
     return {
         "source": "package",
