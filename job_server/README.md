@@ -31,7 +31,7 @@ vLLM のオフライン `LLM` クラスを、ジョブキュー付きの FastAPI
 
 起動時に、vLLM・torch・transformers のバージョン、GPU、ドライバ、モデルと revision、
 このリポジトリの commit hash（未コミットの変更の有無も）、KV キャッシュ容量、チャットテンプレートの
-適用例をログと `jobs_data/server_info_*.json` に記録する。同じ内容を `GET /info` で取得できる。
+適用例をログと `~/job_server_data/jobs/server_info_*.json` に記録する。同じ内容を `GET /info` で取得できる。
 
 再現性のための環境変数（`PYTHONHASHSEED` など）が設定されていない場合は起動しない。
 
@@ -80,7 +80,7 @@ GET /jobs/{job_id}（`done` のとき）：
 
 ## サーバーの再起動
 
-ジョブの入力と結果は `jobs_data/` に保存される。実行中にサーバーが止まったジョブは、
+ジョブの入力と結果は `~/job_server_data/jobs/`（`start_server.sh` の `DATA_ROOT`）に保存される。実行中にサーバーが止まったジョブは、
 次の起動時に `queued` に戻り、job_id 順に再実行される。
 
 ## テスト（GPU 不要）

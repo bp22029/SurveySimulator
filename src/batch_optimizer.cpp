@@ -451,7 +451,7 @@ json reproducibleServerSettings(const json& info) {
         if (info.contains(key)) out[key] = info[key];
     }
     if (info.contains("engine")) {
-        for (const char* key : {"llm", "sampling", "enable_thinking"}) {
+        for (const char* key : {"llm", "sampling", "enable_thinking", "reasoning_effort"}) {
             if (info["engine"].contains(key)) out["engine"][key] = info["engine"][key];
         }
     }

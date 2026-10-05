@@ -3,9 +3,23 @@
 対象：RTX Pro 6000 Blackwell（96GB、1枚）、Ubuntu 26.04
 モデル：`Qwen/Qwen3.8-27B`（revision `1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0`）
 
-- `[Blackwell]` と書いた手順は Blackwell 機で、`[実験用PC]` は C++ をビルドする PC（Docker）で実行する
+- `[Blackwell]` と書いた手順は Blackwell 機で、`[実験用PC]` は C++ をビルドする PC（Docker）で、
+  `[手元]` はリポジトリのある PC（個人のノートPC など）で実行する
 - 各手順の「確認」の出力は、次の手順に進む前に記録しておく（うまくいかなかったときに貼ってもらう）
 - サーバーは研究室の共有物なので、`sudo` が必要な手順（§1.3、§9）は管理者（先生）に確認してから行う
+
+### Blackwell 機に置くもの
+
+環境を汚さないよう、Blackwell 機にはリポジトリを置かず、置き場所を次にまとめる。
+撤去するときはこれらを消すだけでよい（§13）。
+
+| 場所 | 中身 |
+|---|---|
+| `~/job_server/` | サーバーのコード一式（§2 で送る。更新するときは丸ごと入れ替える） |
+| `~/job_server_data/` | ジョブの入力と結果（`jobs/`）、ログ（`logs/`）、モデルのキャッシュ（`hf/`） |
+| `~/miniconda3/` の `job_server` 環境 | Python と vLLM（`conda init` はせず、`.bashrc` は書き換えない） |
+
+C++（BatchOptimizer）と検証用のプロンプト作成は実験用PC で行う。
 
 ---
 
@@ -66,20 +80,45 @@ echo "HF_HOME=${HF_HOME:-未設定（~/.cache/huggingface）}"
 
 ### 1.3 足りないものがあれば
 
-- `tmux` や `git` がない → 管理者に `sudo apt install tmux git` を依頼
+- `tmux` がない → 管理者に `sudo apt install tmux` を依頼するか、§8 の `nohup` で起動する（git は不要）
 - ホームの容量が足りない → モデルの保存先（`HF_HOME`）を広いディスクに置く。場所は管理者に確認
 
 ---
 
-## 2. リポジトリの取得 [Blackwell]
+## 2. サーバー一式を送る
+
+### 2.1 一式を作る [手元]
+
+commit 済みの内容から、サーバーに必要なファイルだけをまとめる（未コミットの変更は入らない）：
 
 ```bash
-cd ~
-git clone https://github.com/bp22029/SurveySimulator.git
 cd SurveySimulator
-git switch feature/job-server
-git log --oneline -1
+git switch feature/job-server && git pull
+python job_server/tools/package.py
+# → job_server_<commitの先頭12桁>.tar.gz
 ```
+
+中には `SOURCE_COMMIT`（元の commit）と `MANIFEST.sha256`（各ファイルのハッシュ）が入る。
+サーバーは起動時にこれと照らし合わせ、`GET /info` の `git` に commit と、書き換えられたファイルがあるか（`dirty`・`modified`）を記録する。
+
+### 2.2 送って展開する
+
+```bash
+# [手元]（踏み台経由）
+scp -J <ユーザー>@<踏み台> job_server_<commit>.tar.gz <ユーザー>@<blackwell>:~/
+
+# [Blackwell]
+cd ~
+tar xzf job_server_<commit>.tar.gz      # ~/job_server/ ができる
+cat ~/job_server/SOURCE_COMMIT
+rm job_server_<commit>.tar.gz
+```
+
+更新するとき：サーバーを止め、`rm -rf ~/job_server` してから新しい一式を展開する。
+`~/job_server_data/` は別の場所なので消えない。
+
+**Blackwell 機の上でファイルを直接書き換えない。** 変更は手元で commit して一式を作り直す
+（直接書き換えると `dirty: true` になり、`BatchOptimizer` の記録からどの設定で動いたかを追えなくなる）。
 
 ---
 
@@ -87,13 +126,18 @@ git log --oneline -1
 
 ### 3.1 Miniconda（`~/miniconda3` がない場合だけ）
 
+`-b`（対話なし）で入れ、`conda init` はしない（`.bashrc` を書き換えないため）。使うときに `source` する：
+
 ```bash
 cd ~
 wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
 bash Miniconda3-latest-Linux-x86_64.sh -b -p ~/miniconda3
-~/miniconda3/bin/conda init bash
-exec bash
+rm Miniconda3-latest-Linux-x86_64.sh
+source ~/miniconda3/etc/profile.d/conda.sh
 ```
+
+以降、新しい端末では最初に `source ~/miniconda3/etc/profile.d/conda.sh` を実行する。
+すでに別の場所に conda がある場合は、`start_server.sh` の `CONDA_SH` をその場所に合わせる。
 
 ### 3.2 環境の作成と vLLM の導入
 
@@ -106,8 +150,8 @@ conda activate job_server
 pip install "vllm==0.30.0"
 pip install "transformers>=5.8.0"
 pip check
-mkdir -p ~/SurveySimulator/job_server/logs
-pip freeze > ~/SurveySimulator/job_server/logs/pip_freeze_$(date +%Y%m%d).txt
+mkdir -p ~/job_server_data/logs
+pip freeze > ~/job_server_data/logs/pip_freeze_$(date +%Y%m%d).txt
 ```
 
 `vllm==0.30.0` は 2026-09-22 時点の最新版。別のバージョンにする場合は、`start_server.sh` と一緒に2人で決めて記録する。
@@ -140,48 +184,50 @@ EOF
 
 ## 4. モデルのダウンロード [Blackwell]
 
-revision を指定して取得する。約 56GB。
+revision を指定して取得する。約 56GB。保存先は `start_server.sh` と同じ `~/job_server_data/hf` にする：
 
 ```bash
-conda activate job_server
+source ~/miniconda3/etc/profile.d/conda.sh && conda activate job_server
+export HF_HOME=~/job_server_data/hf
 hf download Qwen/Qwen3.8-27B --revision 1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0
 ```
 
 確認：
 
 ```bash
-du -sh "${HF_HOME:-$HOME/.cache/huggingface}/hub/models--Qwen--Qwen3.8-27B"
-ls "${HF_HOME:-$HOME/.cache/huggingface}/hub/models--Qwen--Qwen3.8-27B/snapshots/"
+du -sh ~/job_server_data/hf/hub/models--Qwen--Qwen3.8-27B
+ls ~/job_server_data/hf/hub/models--Qwen--Qwen3.8-27B/snapshots/   # 1d4bf0f2... がある
 ```
 
 ---
 
-## 5. チャットテンプレートの確認 [Blackwell]
+## 5. チャットテンプレートの確認 [手元]
 
-モデルに実際に渡される文字列を、reasoning_effort ごとに表示する（GPU は使わない）：
+モデルに実際に渡される文字列を、reasoning_effort ごとに表示する。tokenizer だけを読むので GPU は不要で、
+Blackwell 機ではなくリポジトリのある PC で行う（[uv](https://docs.astral.sh/uv/) がある場合）：
 
 ```bash
-cd ~/SurveySimulator
-python job_server/tools/show_chat_template.py \
+cd SurveySimulator
+uv run --no-project --with "transformers>=5.8" --with jinja2 python job_server/tools/show_chat_template.py \
     --system data/prompt_templates/forQwen/qwen_bfi2.txt \
     --user data/prompt_templates/user_prompt_template.txt
 ```
 
-確認：プロンプトの各行に `\r` が混ざっていないこと（`cat -A data/prompt_templates/forQwen/qwen_bfi2.txt | head -3` で行末が `$` だけ。`^M$` なら改行が CRLF になっている）。
+確認：テンプレートの改行が LF であること（`git ls-files --eol data/prompt_templates` で `w/lf`）。
 
 ---
 
-## 6. 起動スクリプトの設定 [Blackwell]
+## 6. 起動スクリプトの設定 [手元]
 
-`job_server/start_server.sh` を確認する：
+`job_server/start_server.sh` は手元で編集して commit し、§2 の手順で一式を作り直して送る：
 
 - `CONDA_SH`：§3.1 で入れた場所（既定 `~/miniconda3/etc/profile.d/conda.sh`）
-- `CONDA_ENV="job_server"`
+- `CONDA_ENV="job_server"`、`DATA_ROOT="${HOME}/job_server_data"`
 - `MODEL`・`REVISION`：設定済み
-- `REASONING_EFFORT`：§7 で決める。**動作確認と検証の間は仮に `medium` にする**
+- `REASONING_EFFORT`：§7 で決めて書き込む。決まるまでの動作確認と検証では、ファイルは変えずに
+  起動時に `REASONING_EFFORT=medium bash start_server.sh` のように指定する
 
-設定を変えたら、2人の合意のうえで commit する。未コミットの変更があると、`GET /info` の
-`git.dirty` が `true` になり、どの設定で動いたかを後から追えなくなる。
+起動時に上書きした値も `GET /info` に記録され、`BatchOptimizer` は再開時にこれが変わっていたら止まる。
 
 ---
 
@@ -205,20 +251,32 @@ Qwen3.8 はモデル自体が `<think>` から書き始める。C++ 側は「最
 
 ## 8. 起動 [Blackwell]
 
-SSH が切れても止まらないように、tmux の中で起動する：
+SSH が切れても止まらないように、tmux の中で起動する（`REASONING_EFFORT` が `start_server.sh` に
+まだ書かれていない間は、起動時に指定する：§6）：
 
 ```bash
 tmux new -s job_server
-cd ~/SurveySimulator/job_server
-bash start_server.sh
+cd ~/job_server
+REASONING_EFFORT=medium bash start_server.sh
 ```
 
 tmux から抜けるときは `Ctrl-b` → `d`。戻るときは `tmux attach -t job_server`。
+
+tmux が入っておらず入れられない場合は、`nohup` で起動する（ログは `~/job_server_data/logs/` に出る）：
+
+```bash
+cd ~/job_server
+REASONING_EFFORT=medium nohup bash start_server.sh > /dev/null 2>&1 &
+tail -f ~/job_server_data/logs/server_*.log      # 見終わったら Ctrl-c（サーバーは止まらない）
+# 止めるとき
+pkill -INT -f "python server.py"
+```
 
 確認（起動ログ）：
 
 - `server info:` の JSON に、vLLM・torch・transformers のバージョン、GPU、`model`・`revision`、
   `engine.reasoning_effort`、`engine.chat_template_sample` が出ている
+- `git` が `"source": "package"`、`"commit"` が送った一式の commit、`"dirty": false`
 - `kv_cache_tokens` に数値が出ている（`null` なら vLLM の内部の場所が変わっただけで、動作には影響しない）
 - 最後に `server is ready on 0.0.0.0:8000`
 - 環境変数が足りないと `environment variables are not set by the start script` で止まる
@@ -341,18 +399,19 @@ $V compare r1.json r5.json
     $V submit --server $SERVER --requests requests.json --client-id verify --sweep $((20+i)) --skip $i --persons 1 --out r_single_$i.json
   done
   ```
-- batch invariance の有無による速度差：`start_server.sh` の `VLLM_BATCH_INVARIANT=0` で起動し直し、
-  `--client-id verify-bi0` として 10.2 と同じ20人分を流して `elapsed` を比べる（比べ終わったら 1 に戻す）
-- reasoning_effort の比較（§7）：`REASONING_EFFORT` を変えて起動し直し、`--client-id verify-xhigh` などとして
-  20人分を流し、`n_length` と `elapsed` を比べる
+- batch invariance の有無による速度差：`VLLM_BATCH_INVARIANT=0 REASONING_EFFORT=medium bash start_server.sh` で
+  起動し直し、`--client-id verify-bi0` として 10.2 と同じ20人分を流して `elapsed` を比べる（比べ終わったら通常どおり起動し直す）
+- reasoning_effort の比較（§7）：`REASONING_EFFORT=xhigh bash start_server.sh` などで起動し直し、
+  `--client-id verify-xhigh` などとして20人分を流し、`n_length` と `elapsed` を比べる
 
-検証の記録には、各回の `GET /info`（`jobs_data/server_info_*.json`）を添える。
+検証の記録には、各回の `GET /info`（`~/job_server_data/jobs/server_info_*.json`）を添える。
 
 ---
 
 ## 11. 本番の前に
 
-- [ ] `start_server.sh` の `REASONING_EFFORT` を決めて commit した。`GET /info` の `git.dirty` が `false`
+- [ ] `start_server.sh` の `REASONING_EFFORT` を決めて commit し、その commit の一式を送り直した（§2）
+- [ ] 起動時に上書き（`REASONING_EFFORT=...`、`VLLM_BATCH_INVARIANT=...`）をせずに起動した。`GET /info` の `git.dirty` が `false`
 - [ ] §10 の検証1〜3が合格。検証4・5の結果を設計書 §5 に記録した
 - [ ] SA の初期温度・終了温度・周回数を決めた（設計書 §8）
 - [ ] 2人それぞれの設定ファイル（`config/batch_optimizer.example.json` をコピー）で、`client_id` と `run_dir` が別
@@ -373,8 +432,25 @@ docker compose run --rm simulator ./build/src/BatchOptimizer my_config.json
 |---|---|
 | `no kernel image is available for execution on the device` | PyTorch・vLLM のビルドが sm_120 に対応していない。`pip show torch` の版と §1.2 のドライバを記録して相談する |
 | `model type qwen3_5 ... not recognized` | transformers が古い。`pip install "transformers>=5.8.0"` |
-| `unexpected keyword argument 'language_model_only'` | その vLLM では使えない。`engine.py` の `language_model_only=True` の行を外す（画像エンコーダの分だけメモリを使う） |
+| `unexpected keyword argument 'language_model_only'` | その vLLM では使えない。手元で `engine.py` の `language_model_only=True` の行を外して commit し、一式を送り直す（画像エンコーダの分だけメモリを使う） |
 | 起動時に CUDA out of memory | `GPU_MEMORY_UTILIZATION` は上げすぎない（他の利用者がいないか `nvidia-smi` で確認）。`MAX_MODEL_LEN` を下げる前に相談する |
 | `VLLM_BATCH_INVARIANT=1` で起動時にエラー | このモデルの線形注意の部分が batch invariance に対応していない可能性。エラー全文を記録し、`VLLM_BATCH_INVARIANT=0` で検証1〜4を行う（設計書 §5-4 の「同じバッチなら同じ結果」での運用） |
 | `n_length` が多い | `MAX_TOKENS`（4096）で思考が打ち切られている。reasoning_effort を下げるか `MAX_TOKENS` を上げる（2人で合意のうえで） |
 | `HTTP 409` | 同じ `client_id` と `sweep` で別の内容をすでに投げている。検証では `sweep` を変える |
+| `GET /info` の `git.dirty` が `true` | Blackwell 機の上で `~/job_server/` のファイルが書き換えられている（`modified` に一覧）。手元で直して一式を送り直す |
+
+---
+
+## 13. 撤去
+
+サーバーを止めてから：
+
+```bash
+rm -rf ~/job_server                       # コード
+rm -rf ~/job_server_data                  # ジョブの結果・ログ・モデル（必要なものは先に持ち出す）
+source ~/miniconda3/etc/profile.d/conda.sh
+conda env remove -y -n job_server         # Python 環境
+rm -rf ~/miniconda3                       # §3.1 で Miniconda を新しく入れた場合だけ
+```
+
+§9 の ufw の設定を入れた場合は、管理者に `sudo ufw delete allow from 192.168.130.0/24 to any port 8000 proto tcp` を依頼する。

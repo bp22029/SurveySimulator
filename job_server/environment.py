@@ -1,4 +1,5 @@
 """起動時の環境確認と、実験の記録に残すサーバー情報の収集（設計書 §3.3、§6）。"""
+import hashlib
 import os
 import platform
 import socket
@@ -39,7 +40,7 @@ def collect_server_info(engine, args) -> dict:
         "packages": {p: _version(p) for p in PACKAGES},
         "torch_cuda": _torch_cuda(),
         "gpu": _nvidia_smi(),
-        "git": _git_state(Path(__file__).resolve().parent),
+        "git": source_state(Path(__file__).resolve().parent),
         "env": {name: os.environ.get(name) for name in REQUIRED_ENV},
         "model": engine.model,
         "revision": engine.revision,
@@ -65,6 +66,33 @@ def _torch_cuda() -> Optional[str]:
 
 def _nvidia_smi() -> Optional[str]:
     return _run(["nvidia-smi", "--query-gpu=name,driver_version,memory.total", "--format=csv,noheader"])
+
+
+def source_state(code_dir: Path) -> dict:
+    """どの commit のコードで動いているか。
+
+    tools/package.py で作った一式（SOURCE_COMMIT と MANIFEST.sha256 がある）なら、各ファイルのハッシュを
+    照らし合わせ、書き換えられたファイルがあれば dirty にする。なければ git から取る。
+    """
+    commit_file = code_dir / "SOURCE_COMMIT"
+    manifest_file = code_dir / "MANIFEST.sha256"
+    if not commit_file.exists() or not manifest_file.exists():
+        return {"source": "git", **_git_state(code_dir)}
+
+    modified = []
+    for line in manifest_file.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        digest, name = line.split(None, 1)
+        path = code_dir / name.strip()
+        if not path.exists() or hashlib.sha256(path.read_bytes()).hexdigest() != digest:
+            modified.append(name.strip())
+    return {
+        "source": "package",
+        "commit": commit_file.read_text(encoding="utf-8").strip(),
+        "dirty": bool(modified),
+        "modified": modified,
+    }
 
 
 def _git_state(repo_dir: Path) -> dict:
