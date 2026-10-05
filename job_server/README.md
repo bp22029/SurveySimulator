@@ -24,7 +24,9 @@ vLLM のオフライン `LLM` クラスを、ジョブキュー付きの FastAPI
 
 ## 起動（Blackwell 機）
 
-1. `start_server.sh` の `MODEL` と `REVISION`（Hugging Face の commit hash 40桁）を設定し、commit する
+環境構築から検証までの手順は [SETUP_BLACKWELL.md](SETUP_BLACKWELL.md)。
+
+1. `start_server.sh` の `MODEL`・`REVISION`（Hugging Face の commit hash 40桁）・`REASONING_EFFORT` を設定し、commit する
 2. `bash start_server.sh`
 
 起動時に、vLLM・torch・transformers のバージョン、GPU、ドライバ、モデルと revision、
