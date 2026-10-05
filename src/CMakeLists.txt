@@ -79,3 +79,11 @@ add_executable(BatchOptimizer
 target_link_libraries(BatchOptimizer PRIVATE
         SurveySimulatorLib
 )
+
+# (8) sweep 0 のプロンプトを書き出す "DumpPrompts"（job_server の検証用）
+add_executable(DumpPrompts
+        dump_prompts_main.cpp
+)
+target_link_libraries(DumpPrompts PRIVATE
+        SurveySimulatorLib
+)

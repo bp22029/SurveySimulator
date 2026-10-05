@@ -34,6 +34,8 @@ def parse_args():
     p.add_argument("--max-model-len", type=int, default=8192)
     p.add_argument("--gpu-memory-utilization", type=float, default=0.8)
     p.add_argument("--max-tokens", type=int, default=4096)
+    p.add_argument("--reasoning-effort", choices=["xhigh", "medium", "low"],
+                   help="思考の深さ（Qwen3.8 のチャットテンプレートの引数）。省略不可")
     p.add_argument("--echo-engine", action="store_true",
                    help="vLLM を使わず入力を返すだけのエンジンで起動する（GPU のない環境での動作確認用）")
     return p.parse_args()
@@ -51,8 +53,8 @@ def main():
         problems = check_env()
         if problems:
             sys.exit("environment variables are not set by the start script:\n  " + "\n  ".join(problems))
-        if not args.model or not args.revision:
-            sys.exit("--model and --revision are required")
+        if not args.model or not args.revision or not args.reasoning_effort:
+            sys.exit("--model, --revision and --reasoning-effort are required")
         if not re.fullmatch(r"[0-9a-f]{40}", args.revision):
             sys.exit(f"--revision must be a 40-character commit hash: {args.revision!r}")
 
@@ -69,6 +71,7 @@ def main():
             max_model_len=args.max_model_len,
             gpu_memory_utilization=args.gpu_memory_utilization,
             max_tokens=args.max_tokens,
+            reasoning_effort=args.reasoning_effort,
         )
 
     info_json = json.dumps(collect_server_info(engine, args), ensure_ascii=False, indent=2, default=str)

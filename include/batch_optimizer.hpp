@@ -44,6 +44,10 @@ struct BatchOptimizerConfig {
 // JSON ファイルから読む
 BatchOptimizerConfig loadBatchOptimizerConfig(const std::string& path);
 
+// 入力ファイル（人口・質問・テンプレート・正解比率）に CR（\r）が含まれていたら例外。
+// 既存の読み込み関数は \r を取り除かないので、改行が CRLF だとプロンプトが変わってしまう
+void requireLfInputFiles(const BatchOptimizerConfig& config);
+
 // --- 1周の中身（テストのために公開） ----------------------------------
 
 // BFI-2 の15下位特性を、決まった順番で返す

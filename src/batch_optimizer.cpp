@@ -100,6 +100,17 @@ BatchOptimizerConfig loadBatchOptimizerConfig(const std::string& path) {
     return c;
 }
 
+void requireLfInputFiles(const BatchOptimizerConfig& c) {
+    for (const auto& path : {c.population_csv, c.questions_csv, c.system_prompt_path, c.user_prompt_path,
+                             c.real_ratios_csv}) {
+        if (readFile(path).find('\r') != std::string::npos) {
+            throw std::runtime_error(
+                path + " has CRLF line endings. Convert it to LF (e.g. `sed -i 's/\\r$//' " + path +
+                "`); CR characters would end up in the prompts and change the model outputs.");
+        }
+    }
+}
+
 // 最適化の途中で変えてはいけない設定（設計書 §6）
 static json fixedSettings(const BatchOptimizerConfig& c) {
     return {
@@ -488,6 +499,7 @@ void runBatchOptimization(const BatchOptimizerConfig& c, JobClient& client,
     const std::function<void(int)> sleep_sec =
         sleep_arg ? sleep_arg : [](int s) { std::this_thread::sleep_for(std::chrono::seconds(s)); };
 
+    requireLfInputFiles(c);
     const std::vector<Person> base_population = readSyntheticPopulation(c.population_csv);
     const std::vector<Question> questions = readQuestions(c.questions_csv);
     const std::string system_template = readPromptTemplate(c.system_prompt_path);

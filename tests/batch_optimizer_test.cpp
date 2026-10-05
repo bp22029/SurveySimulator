@@ -583,6 +583,17 @@ TEST_F(BatchRunTest, ResumingReusesJobAlreadyOnServer) {
     EXPECT_EQ(checkpoint(c)["job_ids"]["2"], 3);         // 新しいジョブは作られていない
 }
 
+TEST_F(BatchRunTest, RefusesCrlfInputFiles) {
+    auto c = config("crlf");
+    EXPECT_NO_THROW(requireLfInputFiles(c));
+    std::ofstream(dir / "user.txt", std::ios::binary) << "{質問}\r\n{回答選択肢}\r\n";
+    EXPECT_THROW(requireLfInputFiles(c), std::runtime_error);
+    auto server = std::make_shared<FakeJobServer>();
+    auto cl = client(server);
+    EXPECT_THROW(runBatchOptimization(c, cl, noSleep), std::runtime_error);
+    EXPECT_EQ(server->posts, 0);
+}
+
 TEST_F(BatchRunTest, FailedJobIsResubmitted) {
     auto c = config("failed");
     auto server = std::make_shared<FakeJobServer>();

@@ -22,12 +22,14 @@ class VllmEngine:
         max_model_len: int,
         gpu_memory_utilization: float,
         max_tokens: int,
+        reasoning_effort: str,
     ):
         # vLLM は GPU 機にしか入っていないので、ここで初めて import する
         from vllm import LLM, SamplingParams
 
         self.model = model
         self.revision = revision
+        self.reasoning_effort = reasoning_effort
         self.llm_kwargs = dict(
             model=model,
             revision=revision,
@@ -40,6 +42,9 @@ class VllmEngine:
             disable_log_stats=True,
             enforce_eager=True,
             enable_prefix_caching=False,
+            # Qwen3.8 は画像・動画も扱えるモデル。テキストだけ使うので画像エンコーダを読み込まない
+            language_model_only=True,
+            # MTP（投機的デコーディング）は使わない。speculative_config は指定しないこと
         )
         self.llm = LLM(**self.llm_kwargs)
         self.tokenizer = self.llm.get_tokenizer()
@@ -55,9 +60,14 @@ class VllmEngine:
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt},
         ]
-        # 思考モードはデフォルト値に頼らず明示する（設計書 §3.2）
+        # 思考モードと思考の深さはデフォルト値に頼らず明示する（設計書 §3.2）。
+        # Qwen3.8 のテンプレートは reasoning_effort に応じた指示文をシステムプロンプトの先頭に足す
         return self.tokenizer.apply_chat_template(
-            messages, tokenize=False, add_generation_prompt=True, enable_thinking=True
+            messages,
+            tokenize=False,
+            add_generation_prompt=True,
+            enable_thinking=True,
+            reasoning_effort=self.reasoning_effort,
         )
 
     def generate(self, pairs: Sequence[Tuple[str, str]]) -> List[Completion]:
@@ -76,6 +86,7 @@ class VllmEngine:
                 "seed": sp.seed,
             },
             "enable_thinking": True,
+            "reasoning_effort": self.reasoning_effort,
             "kv_cache_tokens": self._kv_cache_tokens(),
             # チャットテンプレートの適用結果を残し、思考モードの扱いを起動ログで確認できるようにする
             "chat_template_sample": self.format_prompt("<SYSTEM>", "<USER>"),

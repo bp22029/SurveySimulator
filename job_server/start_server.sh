@@ -7,12 +7,14 @@ set -euo pipefail
 
 # --- 環境に合わせる -----------------------------------------------------
 CONDA_SH="${HOME}/miniconda3/etc/profile.d/conda.sh"
-CONDA_ENV="vllm_lab"
+CONDA_ENV="job_server"
 PORT=8000
 
-# --- モデル（未決定：設計書 §8） ----------------------------------------
-MODEL=""      # 例: Qwen/xxx-27B
-REVISION=""   # Hugging Face の commit hash（40桁）
+# --- モデル -------------------------------------------------------------
+MODEL="Qwen/Qwen3.8-27B"
+REVISION="1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0"   # 2026-08-14 更新の版
+# 思考の深さ: xhigh（モデルの既定）/ medium / low。研究として決めて設定する（SETUP_BLACKWELL.md §7）
+REASONING_EFFORT=""
 
 # --- 推論設定（見直し対象） --------------------------------------------
 MAX_MODEL_LEN=8192
@@ -25,8 +27,8 @@ export VLLM_ENABLE_V1_MULTIPROCESSING=0
 export VLLM_BATCH_INVARIANT=1
 export CUBLAS_WORKSPACE_CONFIG=:4096:8
 
-if [[ -z "${MODEL}" || -z "${REVISION}" ]]; then
-    echo "MODEL と REVISION を start_server.sh に設定してください" >&2
+if [[ -z "${MODEL}" || -z "${REVISION}" || -z "${REASONING_EFFORT}" ]]; then
+    echo "MODEL・REVISION・REASONING_EFFORT を start_server.sh に設定してください" >&2
     exit 1
 fi
 
@@ -40,6 +42,7 @@ python server.py \
     --data-dir jobs_data \
     --model "${MODEL}" \
     --revision "${REVISION}" \
+    --reasoning-effort "${REASONING_EFFORT}" \
     --max-model-len "${MAX_MODEL_LEN}" \
     --gpu-memory-utilization "${GPU_MEMORY_UTILIZATION}" \
     --max-tokens "${MAX_TOKENS}" \
