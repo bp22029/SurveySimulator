@@ -4,6 +4,7 @@ add_executable(run_tests
         response_parser_test.cpp
         individual_response_manager_test.cpp
         simulation_runner_test.cpp
+        batch_optimizer_test.cpp
 )
 
 # (2) run_tests が必要とするライブラリをリンク

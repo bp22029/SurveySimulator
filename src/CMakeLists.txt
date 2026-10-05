@@ -14,6 +14,11 @@ add_library(SurveySimulatorLib STATIC
         optimization_manager.cpp
         experiment_runner.cpp
         experiment_runner_parallel.cpp
+        # 一括方式（job_server を使う）
+        portable_random.cpp
+        tae_tracker.cpp
+        job_client.cpp
+        batch_optimizer.cpp
 
         # ヘッダファイル
         ../include/data_loader.hpp
@@ -35,6 +40,10 @@ add_library(SurveySimulatorLib STATIC
         ../include/optimization_manager.hpp
         ../include/experiment_runner.hpp
         ../include/experiment_runner_parallel.hpp
+        ../include/portable_random.hpp
+        ../include/tae_tracker.hpp
+        ../include/job_client.hpp
+        ../include/batch_optimizer.hpp
 )
 
 # (2) メインの実行ファイル "SurveySimulator" を定義
@@ -60,5 +69,13 @@ target_link_libraries(SurveySimulatorLib PUBLIC
 
 # (6) 実行ファイルは自作ライブラリをリンクするだけでOK
 target_link_libraries(SurveySimulator PRIVATE
+        SurveySimulatorLib
+)
+
+# (7) 一括方式の最適化 "BatchOptimizer"（job_server を使う）
+add_executable(BatchOptimizer
+        batch_main.cpp
+)
+target_link_libraries(BatchOptimizer PRIVATE
         SurveySimulatorLib
 )
