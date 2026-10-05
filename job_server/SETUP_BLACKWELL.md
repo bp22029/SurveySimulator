@@ -10,14 +10,23 @@
 
 ### Blackwell 機に置くもの
 
-環境を汚さないよう、Blackwell 機にはリポジトリを置かず、置き場所を次にまとめる。
-撤去するときはこれらを消すだけでよい（§13）。
+環境を汚さないよう、Blackwell 機にはリポジトリを置かず、すべてを `~/llmsrv` の中に置く。
+`.bashrc` やホームの `~/.cache` は使わない。撤去するときは `~/llmsrv` を消すだけでよい（§13）。
 
 | 場所 | 中身 |
 |---|---|
-| `~/job_server/` | サーバーのコード一式（§2 で送る。更新するときは丸ごと入れ替える） |
-| `~/job_server_data/` | ジョブの入力と結果（`jobs/`）、ログ（`logs/`）、モデルのキャッシュ（`hf/`） |
-| `~/miniconda3/` の `job_server` 環境 | Python と vLLM（`conda init` はせず、`.bashrc` は書き換えない） |
+| `~/llmsrv/job_server/` | サーバーのコード一式（§2 で送る。更新するときは丸ごと入れ替える） |
+| `~/llmsrv/bin/uv` | Python 環境を作る道具（uv） |
+| `~/llmsrv/python/` | uv が入れた Python 3.12 |
+| `~/llmsrv/venv/` | vLLM などを入れた Python 環境 |
+| `~/llmsrv/data/` | ジョブの入力と結果（`jobs/`）、ログ（`logs/`）、モデル（`hf/`） |
+| `~/llmsrv/cache/` | uv・vLLM・Triton などのキャッシュ |
+
+これらの場所は `job_server/env.sh` で設定する。新しいターミナルでは、最初に次を実行する（venv にも入る）：
+
+```bash
+source ~/llmsrv/job_server/env.sh
+```
 
 C++（BatchOptimizer）と検証用のプロンプト作成は実験用PC で行う。
 
@@ -61,8 +70,7 @@ nvidia-smi --query-gpu=name,compute_cap,driver_version,memory.total --format=csv
 df -h ~ /tmp
 free -g
 nproc
-which conda python3 git tmux; python3 --version; git --version
-ls ~/miniconda3 2>/dev/null | head -3
+which curl python3 tmux; python3 --version
 ip -4 addr | grep inet
 sudo -n ufw status 2>&1 | head -5
 echo "HF_HOME=${HF_HOME:-未設定（~/.cache/huggingface）}"
@@ -72,13 +80,14 @@ echo "HF_HOME=${HF_HOME:-未設定（~/.cache/huggingface）}"
 
 - GPU 名に `RTX PRO 6000` を含み、`compute_cap` が `12.0`、`memory.total` が約 96GB
 - ドライバのバージョン（CUDA 12.8 以上に対応するドライバが必要。§3 の確認で実際に動くかを見る）
-- ホームの空き容量が **80GB 以上**（モデル 56GB ＋ Python 環境 約15GB ＋ ジョブの保存先）
+- ホームの空き容量が **80GB 以上**（`~/llmsrv` にモデル 56GB ＋ Python 環境 約15GB ＋ ジョブの保存先）
+- `curl` があること（§3.1 で uv を入れるのに使う）
 - `tmux` があること（SSH が切れてもサーバーを動かし続けるため）
 
 ### 1.3 足りないものがあれば
 
 - `tmux` がない → 管理者に `sudo apt install tmux` を依頼するか、§8 の `nohup` で起動する（git は不要）
-- ホームの容量が足りない → モデルの保存先（`HF_HOME`）を広いディスクに置く。場所は管理者に確認
+- ホームの容量が足りない → `~/llmsrv` を広いディスクに置き、ホームからシンボリックリンクを張る。場所は管理者に確認
 
 ---
 
@@ -107,19 +116,21 @@ VS Code のリモート接続（研究室PC を経由した2段階の SSH）で 
 3. VS Code のターミナル（Blackwell 機で動いている）で展開する：
 
 ```bash
-cd ~
-tar xzf job_server_<commit>.tar.gz      # ~/job_server/ ができる
-cat ~/job_server/SOURCE_COMMIT
+mkdir -p ~/llmsrv && mv ~/job_server_<commit>.tar.gz ~/llmsrv/ && cd ~/llmsrv
+tar xzf job_server_<commit>.tar.gz      # ~/llmsrv/job_server/ ができる
+cat job_server/SOURCE_COMMIT
 rm job_server_<commit>.tar.gz
 ```
+
+（最初から `~/llmsrv` にアップロードした場合は `mv` は不要）
 
 手元に残った `job_server_<commit>.tar.gz` は消してよい（commit しない）。
 
 コマンドで送る場合は、VS Code が使っている `~/.ssh/config` の Host 名（ProxyJump の設定込み）で
-`scp job_server_<commit>.tar.gz <BlackwellのHost名>:~/` とする。
+`scp job_server_<commit>.tar.gz <BlackwellのHost名>:~/llmsrv/` とする。
 
-更新するとき：サーバーを止め、`rm -rf ~/job_server` してから新しい一式を展開する。
-`~/job_server_data/` は別の場所なので消えない。
+更新するとき：サーバーを止め、`rm -rf ~/llmsrv/job_server` してから新しい一式を `~/llmsrv` で展開する。
+`venv/`・`data/` などは別の場所なので消えない。
 
 **Blackwell 機の上でファイルを直接書き換えない。** 変更は手元で commit して一式を作り直す
 （直接書き換えると `dirty: true` になり、`BatchOptimizer` の記録からどの設定で動いたかを追えなくなる）。
@@ -128,34 +139,31 @@ rm job_server_<commit>.tar.gz
 
 ## 3. Python 環境 [Blackwell]
 
-### 3.1 Miniconda（`~/miniconda3` がない場合だけ）
+### 3.1 uv を入れる
 
-`-b`（対話なし）で入れ、`conda init` はしない（`.bashrc` を書き換えないため）。使うときに `source` する：
+uv を `~/llmsrv/bin` に入れる。`UV_NO_MODIFY_PATH=1` で `.bashrc` などを書き換えないようにする：
 
 ```bash
-cd ~
-wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
-bash Miniconda3-latest-Linux-x86_64.sh -b -p ~/miniconda3
-rm Miniconda3-latest-Linux-x86_64.sh
-source ~/miniconda3/etc/profile.d/conda.sh
+curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR="$HOME/llmsrv/bin" UV_NO_MODIFY_PATH=1 sh
+source ~/llmsrv/job_server/env.sh
+uv --version
 ```
 
-以降、新しい端末では最初に `source ~/miniconda3/etc/profile.d/conda.sh` を実行する。
-すでに別の場所に conda がある場合は、`start_server.sh` の `CONDA_SH` をその場所に合わせる。
+### 3.2 Python 環境の作成と vLLM の導入
 
-### 3.2 環境の作成と vLLM の導入
-
-Ubuntu 26.04 のシステムの Python は使わず、conda で Python 3.12 を入れる。
+システムの Python（3.14）は使わず、uv で Python 3.12 を入れて venv を作る。
 vLLM はバージョンを固定する（設計書 §6：同じ vLLM バージョンでしか再現性は保証されない）。
+`--torch-backend=auto` は、ドライバに合った CUDA 版の PyTorch を選ぶ（vLLM の公式の入れ方）。
 
 ```bash
-conda create -y -n job_server python=3.12
-conda activate job_server
-pip install "vllm==0.30.0"
-pip install "transformers>=5.8.0"
-pip check
-mkdir -p ~/job_server_data/logs
-pip freeze > ~/job_server_data/logs/pip_freeze_$(date +%Y%m%d).txt
+source ~/llmsrv/job_server/env.sh
+uv venv ~/llmsrv/venv --python 3.12
+source ~/llmsrv/job_server/env.sh          # 作った venv に入る
+uv pip install "vllm==0.30.0" --torch-backend=auto
+uv pip install "transformers>=5.8.0"
+uv pip check
+mkdir -p ~/llmsrv/data/logs
+uv pip freeze > ~/llmsrv/data/logs/pip_freeze_$(date +%Y%m%d).txt
 ```
 
 `vllm==0.30.0` は 2026-09-22 時点の最新版。別のバージョンにする場合は、`start_server.sh` と一緒に2人で決めて記録する。
@@ -163,6 +171,7 @@ pip freeze > ~/job_server_data/logs/pip_freeze_$(date +%Y%m%d).txt
 ### 3.3 確認
 
 ```bash
+source ~/llmsrv/job_server/env.sh
 python - <<'EOF'
 import torch, vllm, transformers
 print("torch", torch.__version__, "cuda", torch.version.cuda)
@@ -188,19 +197,19 @@ EOF
 
 ## 4. モデルのダウンロード [Blackwell]
 
-revision を指定して取得する。約 56GB。保存先は `start_server.sh` と同じ `~/job_server_data/hf` にする：
+revision を指定して取得する。約 56GB。保存先は `env.sh` が設定する `~/llmsrv/data/hf`：
 
 ```bash
-source ~/miniconda3/etc/profile.d/conda.sh && conda activate job_server
-export HF_HOME=~/job_server_data/hf
+source ~/llmsrv/job_server/env.sh
+echo $HF_HOME                              # ~/llmsrv/data/hf になっていること
 hf download Qwen/Qwen3.8-27B --revision 1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0
 ```
 
 確認：
 
 ```bash
-du -sh ~/job_server_data/hf/hub/models--Qwen--Qwen3.8-27B
-ls ~/job_server_data/hf/hub/models--Qwen--Qwen3.8-27B/snapshots/   # 1d4bf0f2... がある
+du -sh ~/llmsrv/data/hf/hub/models--Qwen--Qwen3.8-27B
+ls ~/llmsrv/data/hf/hub/models--Qwen--Qwen3.8-27B/snapshots/   # 1d4bf0f2... がある
 ```
 
 ---
@@ -225,8 +234,7 @@ uv run --no-project --with "transformers>=5.8" --with jinja2 python job_server/t
 
 `job_server/start_server.sh` は手元で編集して commit し、§2 の手順で一式を作り直して送る：
 
-- `CONDA_SH`：§3.1 で入れた場所（既定 `~/miniconda3/etc/profile.d/conda.sh`）
-- `CONDA_ENV="job_server"`、`DATA_ROOT="${HOME}/job_server_data"`
+- 置き場所は `env.sh`（`~/llmsrv` の中）で決まるので、`start_server.sh` に設定はない
 - `MODEL`・`REVISION`：設定済み
 - `REASONING_EFFORT`：§7 で決めて書き込む。決まるまでの動作確認と検証では、ファイルは変えずに
   起動時に `REASONING_EFFORT=medium bash start_server.sh` のように指定する
@@ -260,18 +268,18 @@ SSH が切れても止まらないように、tmux の中で起動する（`REAS
 
 ```bash
 tmux new -s job_server
-cd ~/job_server
+cd ~/llmsrv/job_server
 REASONING_EFFORT=medium bash start_server.sh
 ```
 
 tmux から抜けるときは `Ctrl-b` → `d`。戻るときは `tmux attach -t job_server`。
 
-tmux が入っておらず入れられない場合は、`nohup` で起動する（ログは `~/job_server_data/logs/` に出る）：
+tmux が入っておらず入れられない場合は、`nohup` で起動する（ログは `~/llmsrv/data/logs/` に出る）：
 
 ```bash
-cd ~/job_server
+cd ~/llmsrv/job_server
 REASONING_EFFORT=medium nohup bash start_server.sh > /dev/null 2>&1 &
-tail -f ~/job_server_data/logs/server_*.log      # 見終わったら Ctrl-c（サーバーは止まらない）
+tail -f ~/llmsrv/data/logs/server_*.log      # 見終わったら Ctrl-c（サーバーは止まらない）
 # 止めるとき
 pkill -INT -f "python server.py"
 ```
@@ -408,7 +416,7 @@ $V compare r1.json r5.json
 - reasoning_effort の比較（§7）：`REASONING_EFFORT=xhigh bash start_server.sh` などで起動し直し、
   `--client-id verify-xhigh` などとして20人分を流し、`n_length` と `elapsed` を比べる
 
-検証の記録には、各回の `GET /info`（`~/job_server_data/jobs/server_info_*.json`）を添える。
+検証の記録には、各回の `GET /info`（`~/llmsrv/data/jobs/server_info_*.json`）を添える。
 
 ---
 
@@ -434,14 +442,14 @@ docker compose run --rm simulator ./build/src/BatchOptimizer my_config.json
 
 | 症状 | 対処 |
 |---|---|
-| `no kernel image is available for execution on the device` | PyTorch・vLLM のビルドが sm_120 に対応していない。`pip show torch` の版と §1.2 のドライバを記録して相談する |
-| `model type qwen3_5 ... not recognized` | transformers が古い。`pip install "transformers>=5.8.0"` |
+| `no kernel image is available for execution on the device` | PyTorch・vLLM のビルドが sm_120 に対応していない。`uv pip show torch` の版と §1.2 のドライバを記録して相談する |
+| `model type qwen3_5 ... not recognized` | transformers が古い。`source ~/llmsrv/job_server/env.sh && uv pip install "transformers>=5.8.0"` |
 | `unexpected keyword argument 'language_model_only'` | その vLLM では使えない。手元で `engine.py` の `language_model_only=True` の行を外して commit し、一式を送り直す（画像エンコーダの分だけメモリを使う） |
 | 起動時に CUDA out of memory | `GPU_MEMORY_UTILIZATION` は上げすぎない（他の利用者がいないか `nvidia-smi` で確認）。`MAX_MODEL_LEN` を下げる前に相談する |
 | `VLLM_BATCH_INVARIANT=1` で起動時にエラー | このモデルの線形注意の部分が batch invariance に対応していない可能性。エラー全文を記録し、`VLLM_BATCH_INVARIANT=0` で検証1〜4を行う（設計書 §5-4 の「同じバッチなら同じ結果」での運用） |
 | `n_length` が多い | `MAX_TOKENS`（4096）で思考が打ち切られている。reasoning_effort を下げるか `MAX_TOKENS` を上げる（2人で合意のうえで） |
 | `HTTP 409` | 同じ `client_id` と `sweep` で別の内容をすでに投げている。検証では `sweep` を変える |
-| `GET /info` の `git.dirty` が `true` | Blackwell 機の上で `~/job_server/` のファイルが書き換えられている（`modified` に一覧）。手元で直して一式を送り直す |
+| `GET /info` の `git.dirty` が `true` | Blackwell 機の上で `~/llmsrv/job_server/` のファイルが書き換えられている（`modified` に一覧）。手元で直して一式を送り直す |
 
 ---
 
@@ -450,11 +458,8 @@ docker compose run --rm simulator ./build/src/BatchOptimizer my_config.json
 サーバーを止めてから：
 
 ```bash
-rm -rf ~/job_server                       # コード
-rm -rf ~/job_server_data                  # ジョブの結果・ログ・モデル（必要なものは先に持ち出す）
-source ~/miniconda3/etc/profile.d/conda.sh
-conda env remove -y -n job_server         # Python 環境
-rm -rf ~/miniconda3                       # §3.1 で Miniconda を新しく入れた場合だけ
+# 残したいもの（~/llmsrv/data/jobs のジョブの結果、~/llmsrv/data/logs のログ）は先に持ち出す
+rm -rf ~/llmsrv          # コード・uv・Python・venv・モデル・キャッシュがすべて消える
 ```
 
 §9 の ufw の設定を入れた場合は、管理者に `sudo ufw delete allow from 192.168.130.0/24 to any port 8000 proto tcp` を依頼する。

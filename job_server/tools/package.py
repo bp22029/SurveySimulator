@@ -26,6 +26,7 @@ FILES = [
     "engine.py",
     "environment.py",
     "start_server.sh",
+    "env.sh",
     "README.md",
     "SETUP_BLACKWELL.md",
 ]

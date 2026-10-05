@@ -1,16 +1,11 @@
 #!/bin/bash
 # 個性割り当て用LLMサーバーの起動スクリプト（Blackwell 機で実行する）
 #
-# このファイルの設定値を変えるときは、2人の合意のうえで commit してから起動すること。
-# 起動ログとサーバー情報に、このリポジトリの commit hash が記録される（設計書 §6）。
+# このファイルの設定値を変えるときは、2人の合意のうえで commit し、一式を作り直して送ること。
+# 起動ログとサーバー情報に、一式の元になった commit が記録される（設計書 §6）。
 set -euo pipefail
 
-# --- 環境に合わせる -----------------------------------------------------
-CONDA_SH="${HOME}/miniconda3/etc/profile.d/conda.sh"
-CONDA_ENV="job_server"
 PORT=8000
-# ジョブの入力と結果・ログ・モデルのキャッシュの置き場所。コード（このディレクトリ）とは分ける
-DATA_ROOT="${HOME}/job_server_data"
 
 # --- モデル -------------------------------------------------------------
 MODEL="Qwen/Qwen3.8-27B"
@@ -36,12 +31,15 @@ if [[ -z "${MODEL}" || -z "${REVISION}" || -z "${REASONING_EFFORT}" ]]; then
     exit 1
 fi
 
-export HF_HOME="${DATA_ROOT}/hf"
-
 cd "$(dirname "$0")"
-source "${CONDA_SH}"
-conda activate "${CONDA_ENV}"
+# 置き場所（~/llmsrv の中の venv・data・cache）を設定し、venv に入る
+source ./env.sh
+if [[ -z "${VIRTUAL_ENV:-}" ]]; then
+    echo "${LLMSRV_ROOT}/venv がありません（SETUP_BLACKWELL.md §3）" >&2
+    exit 1
+fi
 
+DATA_ROOT="${LLMSRV_ROOT}/data"
 mkdir -p "${DATA_ROOT}/logs"
 python server.py \
     --port "${PORT}" \
