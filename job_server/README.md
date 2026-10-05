@@ -1,6 +1,8 @@
-# llm_server：個性割り当て用バッチ推論サーバー
+# job_server：個性割り当て用バッチ推論サーバー
 
 vLLM のオフライン `LLM` クラスを、ジョブキュー付きの FastAPI でサーバー化したもの。
+昨年度（Qwen3-14B、GPU 2枚）のサーバーは `llm_server/` に当時のまま残してある。
+
 複数のクライアント（2人）が同じサーバーを使っても、それぞれの結果が変わらないようにする。
 
 - GPU で同時に実行するのは常に 1 ジョブだけ。1 ジョブにつき 1 回 `llm.generate()` を呼ぶ
@@ -83,11 +85,11 @@ GET /jobs/{job_id}（`done` のとき）：
 
 ```bash
 pip install fastapi uvicorn httpx pytest
-pytest llm_server/tests
+pytest job_server/tests
 ```
 
 vLLM の代わりに入力を返すだけのエンジンで起動して、API を手元で試すこともできる：
 
 ```bash
-python llm_server/server.py --echo-engine --host 127.0.0.1 --port 8765 --data-dir /tmp/jobs_data
+python job_server/server.py --echo-engine --host 127.0.0.1 --port 8765 --data-dir /tmp/jobs_data
 ```

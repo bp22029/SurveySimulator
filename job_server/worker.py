@@ -6,7 +6,7 @@ import traceback
 
 from job_store import JobStore
 
-log = logging.getLogger("llm_server.worker")
+log = logging.getLogger("job_server.worker")
 
 
 class Worker(threading.Thread):

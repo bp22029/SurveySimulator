@@ -1,89 +1,103 @@
-"""個性割り当て用のバッチ推論サーバー（設計書: 個性割り当て用LLMサーバー 設計決定事項）。
-
-vLLM のオフライン LLM クラスを、ジョブキュー付きの FastAPI でサーバー化する。
-GPU で同時に実行するのは常に 1 ジョブだけで、1 ジョブにつき 1 回 generate() を呼ぶ。
-環境変数は起動スクリプト（start_server.sh）で設定すること。
-"""
-import argparse
-import json
-import logging
-import re
-import sys
-import time
-from pathlib import Path
-
+from fastapi import FastAPI, Request
+from vllm import LLM, SamplingParams
+from pydantic import BaseModel 
+from typing import List
 import uvicorn
+import os
 
-from app import create_app
-from engine import EchoEngine, VllmEngine
-from environment import check_env, collect_server_info
-from job_store import JobStore
-from worker import Worker
+import time
+import random
+import numpy as np
+import torch
+import argparse
 
-log = logging.getLogger("llm_server")
+# os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+os.environ["VLLM_ENABLE_V1_MULTIPROCESSING"] = "0"
 
+os.environ['CUBLAS_WORKSPACE_CONFIG'] = ':4096:8'
+os.environ['PYTHONHASHSEED'] = '42'
+os.environ["VLLM_BATCH_INVARIANT"] = "1"
 
-def parse_args():
-    p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("--host", default="0.0.0.0")
-    p.add_argument("--port", type=int, default=8000)
-    p.add_argument("--data-dir", type=Path, default=Path("jobs_data"),
-                   help="ジョブの入力と結果を保存するディレクトリ")
-    p.add_argument("--model", help="Hugging Face のモデル名")
-    p.add_argument("--revision", help="Hugging Face の commit hash（40桁）")
-    p.add_argument("--max-model-len", type=int, default=8192)
-    p.add_argument("--gpu-memory-utilization", type=float, default=0.8)
-    p.add_argument("--max-tokens", type=int, default=4096)
-    p.add_argument("--echo-engine", action="store_true",
-                   help="vLLM を使わず入力を返すだけのエンジンで起動する（GPU のない環境での動作確認用）")
-    return p.parse_args()
+#os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 
-def main():
-    logging.basicConfig(
-        level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s"
-    )
-    args = parse_args()
+app = FastAPI()
 
-    if args.echo_engine:
-        engine = EchoEngine()
-    else:
-        problems = check_env()
-        if problems:
-            sys.exit("environment variables are not set by the start script:\n  " + "\n  ".join(problems))
-        if not args.model or not args.revision:
-            sys.exit("--model and --revision are required")
-        if not re.fullmatch(r"[0-9a-f]{40}", args.revision):
-            sys.exit(f"--revision must be a 40-character commit hash: {args.revision!r}")
+class PromptRequest(BaseModel):
+    id: int
+    system_prompt: str
+    user_prompt: str
 
-    store = JobStore(args.data_dir)
-    recovered = store.recover()
-    if recovered:
-        log.info("requeued %d job(s) that were running when the server stopped", recovered)
+def set_seed(seed=42):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
 
-    if not args.echo_engine:
-        log.info("loading model %s@%s ...", args.model, args.revision)
-        engine = VllmEngine(
-            model=args.model,
-            revision=args.revision,
-            max_model_len=args.max_model_len,
-            gpu_memory_utilization=args.gpu_memory_utilization,
-            max_tokens=args.max_tokens,
+print(">>> Setting seed...")
+set_seed(42)
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--port", type=int, default=8000, help="Port to run the server on")
+args = parser.parse_args()
+
+# ★ここで既存のLLMクラス（オフラインエンジン）を初期化
+print("Loading model...")
+llm = LLM(
+    model="Qwen/Qwen3-14B",
+    seed=42,
+    tensor_parallel_size=1,
+    dtype="bfloat16",
+    gpu_memory_utilization=0.8,
+    # max_model_len=4096,
+    max_model_len=8192,
+    disable_log_stats=True,
+    enforce_eager=True
+)
+tokenizer = llm.get_tokenizer()
+sampling_params = SamplingParams(
+    temperature=0.0,
+    top_p=1.0,
+    # max_tokens=1024,
+    max_tokens=4096,
+    seed=42
+)
+
+print(">>> Server is ready.")
+@app.post("/generate")
+async def generate_response(data: List[PromptRequest]):
+    # data はもう辞書(dict)ではなく、オブジェクトのリストになっています
+    prompts = []
+    ids = []
+    
+    for item in data:
+        # ★ 辞書アクセス item["key"] ではなく、ドットアクセス item.key に変わります！
+        messages = [
+            {"role": "system", "content": item.system_prompt},
+            {"role": "user", "content": item.user_prompt},
+        ]
+        
+        # テンプレート適用 (tokenizerなどの変数はグローバルにある前提)
+        formatted_prompt = tokenizer.apply_chat_template(
+            messages, tokenize=False, add_generation_prompt=True
         )
+        prompts.append(formatted_prompt)
+        ids.append(item.id)
 
-    info_json = json.dumps(collect_server_info(engine, args), ensure_ascii=False, indent=2, default=str)
-    info = json.loads(info_json)
-    log.info("server info:\n%s", info_json)
-    info_path = args.data_dir / f"server_info_{time.strftime('%Y%m%d_%H%M%S')}.json"
-    info_path.write_text(info_json, encoding="utf-8")
+    # 推論実行
+    outputs = llm.generate(prompts, sampling_params)
 
-    worker = Worker(store, engine)
-    worker.start()
+    # 結果の整形
+    results = []
+    for i, output in enumerate(outputs):
+        results.append({
+            "id": ids[i],
+            "response": output.outputs[0].text
+        })
 
-    app = create_app(store, worker.notify, info)
-    log.info("server is ready on %s:%d", args.host, args.port)
-    uvicorn.run(app, host=args.host, port=args.port)
-
+    return results
 
 if __name__ == "__main__":
-    main()
+    # サーバーを起動
+    print(f"Starting server on port {args.port}...")
+    uvicorn.run(app, host="127.0.0.1", port=args.port)
