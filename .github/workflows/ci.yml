@@ -38,3 +38,14 @@ jobs:
       - name: Run Tests
         working-directory: ./build # buildディレクトリに移動してから実行
         run: ctest -V # CTestを詳細モードで実行
+
+  # LLMサーバーのAPI・キューのテスト（vLLM は使わないので GPU 不要）
+  llm-server-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install fastapi uvicorn httpx pytest
+      - run: pytest -q llm_server/tests
