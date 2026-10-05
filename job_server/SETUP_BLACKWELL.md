@@ -47,11 +47,8 @@ C++（BatchOptimizer）と検証用のプロンプト作成は実験用PC で行
 
 ### 1.1 ログイン
 
-踏み台を経由して入る（`<踏み台>` と `<blackwell>` は実際のホスト名に置き換える）：
-
-```bash
-ssh -J <ユーザー>@<踏み台> <ユーザー>@<blackwell>
-```
+いつもどおり VS Code のリモート接続（研究室PC を経由）で Blackwell 機に入り、VS Code のターミナルを開く。
+以降の `[Blackwell]` のコマンドはそのターミナルで実行する。
 
 ### 1.2 環境の確認
 
@@ -103,16 +100,23 @@ python job_server/tools/package.py
 
 ### 2.2 送って展開する
 
-```bash
-# [手元]（踏み台経由）
-scp -J <ユーザー>@<踏み台> job_server_<commit>.tar.gz <ユーザー>@<blackwell>:~/
+VS Code のリモート接続（研究室PC を経由した2段階の SSH）で Blackwell 機に入っている場合：
 
-# [Blackwell]
+1. VS Code で Blackwell 機に接続し、「フォルダーを開く」でホーム（`/home/<ユーザー>`）を開く
+2. 手元の `job_server_<commit>.tar.gz` を、VS Code のエクスプローラー欄へドラッグ＆ドロップする（アップロードされる）
+3. VS Code のターミナル（Blackwell 機で動いている）で展開する：
+
+```bash
 cd ~
 tar xzf job_server_<commit>.tar.gz      # ~/job_server/ ができる
 cat ~/job_server/SOURCE_COMMIT
 rm job_server_<commit>.tar.gz
 ```
+
+手元に残った `job_server_<commit>.tar.gz` は消してよい（commit しない）。
+
+コマンドで送る場合は、VS Code が使っている `~/.ssh/config` の Host 名（ProxyJump の設定込み）で
+`scp job_server_<commit>.tar.gz <BlackwellのHost名>:~/` とする。
 
 更新するとき：サーバーを止め、`rm -rf ~/job_server` してから新しい一式を展開する。
 `~/job_server_data/` は別の場所なので消えない。
