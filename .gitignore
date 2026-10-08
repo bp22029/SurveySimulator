@@ -16,3 +16,6 @@ cmake-build-*/
 data/verification_population.csv
 data/merged_population_responses.csv
 *:Zone.Identifier
+docs/
+# job_server/tools/package.py の出力（commit から作り直せる）
+/job_server_*.tar.gz
