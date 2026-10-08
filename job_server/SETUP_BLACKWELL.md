@@ -50,8 +50,9 @@ C++（BatchOptimizer）と検証用のプロンプト作成は実験用PC で行
 - vLLM 0.30.0 は、このモデルの線形注意（GDN）で batch invariance に対応していない。`VLLM_BATCH_INVARIANT=1` では
   `RuntimeError: VLLM batch_invariant mode is not supported for GDN_ATTN.` で起動しないため、`0` に固定している
 - そのため保証されるのは「同じバッチを同じ設定で流せば同じ結果」まで。同じジョブの繰り返し・他のクライアントとの交互利用・
-  再起動・クライアントの再開では同じ結果になる見込み（§10 の検証1〜3で実測）だが、ある人の回答は同じジョブの他の人の内容にも
-  わずかに左右されうる（検証4は不一致になる見込み）。論文にはこの性質を書く
+  再起動では完全に同じ結果になった（2026-10-08、§10 の検証1〜3）が、ある人の回答は同じジョブの他の人の内容にも
+  左右される（検証4：1人だけのジョブにすると51件中9件で回答番号が変わった）。論文にはこの性質を書く。
+  結果は [verification/README.md](verification/README.md)
 - 同時に処理する本数を決める設定（`GPU_MEMORY_UTILIZATION`・`MAX_TOKENS`・`MAX_MODEL_LEN`）も出力に影響するので、
   検証の前に決めて以降は変えない。`GET /info` の `engine.scheduler`・`engine.cache` に記録され、`BatchOptimizer` は再開時に
   これが変わっていたら止まる
@@ -359,6 +360,8 @@ curl -s http://localhost:8000/queue
 ## 10. 再現性の検証（設計書 §5）
 
 本番の前に行う。全員分（20,553件）を毎回流すと時間がかかるので、まず20人分（1,020件）で行う。
+結果は `verification/` に記録する（2026-10-08 の reasoning_effort=medium の結果：[verification/README.md](verification/README.md)）。
+`compare` は全文の一致と、最終回答（C++ と同じく最後の `</think>` の後の最後の `<answer>`）の違いを表示する。
 
 ### 10.1 プロンプトの用意 [実験用PC]
 
@@ -426,7 +429,7 @@ batch invariance を使えない（§0）ので、一致しない見込み。ど
 記録する。一括方式では毎周 403人分を同じ並び（population の順）で1ジョブにするので運用上は成り立つが、
 1人だけを再推論して結果を比べる、といった使い方はできない。結果は設計書 §5 に記録する
 
-回答番号の違いは、`compare` の出力に表示される差分の箇所で確認する（思考の途中で分かれても、最終回答が同じことは多い）。
+回答番号まで変わった件数は `compare` の `different final answer` に出る（思考の途中で分かれても、最終回答が同じことは多い）。
 
 ### 10.6 検証5：速度（と reasoning_effort の比較）
 

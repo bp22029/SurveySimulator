@@ -4,8 +4,9 @@
   python verify.py submit --server http://HOST:8000 --requests requests.json \
       --client-id verify --sweep 1 --persons 20 --out r1.json
 
-  # 2つの結果を比べる（共通する id の応答テキストが完全に一致するか）
+  # 2つの結果を比べる（共通する id の応答テキストが完全に一致するか、最終回答の番号が同じか）
   python verify.py compare r1.json r2.json
+  python verify.py compare verification/2026-10-08_medium/r1.json.gz r_new.json   # .gz も読める
 
   # 保存した結果の出力トークン数の分布
   python verify.py stats r1.json
@@ -15,6 +16,7 @@ client_id と sweep の組はジョブごとに一意なので、同じ入力を
 import argparse
 import gzip
 import json
+import re
 import sys
 import time
 import urllib.error
@@ -105,22 +107,38 @@ def print_token_stats(results):
     print(f"finish_reason: {reasons}")
 
 
+def load_results(path):
+    opener = gzip.open if path.endswith(".gz") else open
+    with opener(path, "rt", encoding="utf-8") as f:
+        return json.load(f)["results"]
+
+
+ANSWER = re.compile(r"<answer>\s*(\d+)\s*</answer>")
+
+
+def final_answer(response):
+    """C++ の extractFinalAnswer と同じ：最後の </think> の後の、最後の <answer>。取れなければ -1。"""
+    tail = response.rsplit("</think>", 1)[-1]
+    found = ANSWER.findall(tail)
+    return int(found[-1]) if found else -1
+
+
 def cmd_stats(args):
-    with open(args.file, encoding="utf-8") as f:
-        print_token_stats(json.load(f)["results"])
+    print_token_stats(load_results(args.file))
 
 
 def cmd_compare(args):
-    def load(path):
-        with open(path, encoding="utf-8") as f:
-            return {r["id"]: r for r in json.load(f)["results"]}
-
-    a, b = load(args.a), load(args.b)
+    a = {r["id"]: r for r in load_results(args.a)}
+    b = {r["id"]: r for r in load_results(args.b)}
     common = sorted(set(a) & set(b))
     if not common:
         sys.exit("no common ids")
     diff = [i for i in common if a[i]["response"] != b[i]["response"]]
-    print(f"common ids: {len(common)}  identical: {len(common) - len(diff)}  different: {len(diff)}")
+    answer_diff = [i for i in diff if final_answer(a[i]["response"]) != final_answer(b[i]["response"])]
+    print(f"common ids: {len(common)}  identical: {len(common) - len(diff)}  different: {len(diff)}  "
+          f"different final answer: {len(answer_diff)}")
+    for i in answer_diff:
+        print(f"  {i}: A={final_answer(a[i]['response'])} B={final_answer(b[i]['response'])}")
     for i in diff[: args.show]:
         x, y = a[i]["response"], b[i]["response"]
         k = next((n for n in range(min(len(x), len(y))) if x[n] != y[n]), min(len(x), len(y)))
