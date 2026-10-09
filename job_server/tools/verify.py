@@ -2,6 +2,7 @@
 
   # requests.json（DumpPrompts の出力）から一部の人を選んで投げ、結果を保存する
   python verify.py submit --server http://HOST:8000 --requests requests.json \
+      --enable-thinking true --reasoning-effort medium --max-tokens 8192 \
       --client-id verify --sweep 1 --persons 20 --out r1.json
 
   # 2つの結果を比べる（共通する id の応答テキストが完全に一致するか、最終回答の番号が同じか）
@@ -12,6 +13,8 @@
   python verify.py stats r1.json
 
 client_id と sweep の組はジョブごとに一意なので、同じ入力を何度も推論するときは sweep を変える。
+enable_thinking・reasoning_effort・max_tokens はジョブの推論条件で、比べる2つの結果では揃えること（compare が表示する）。
+思考なし（--enable-thinking false）のときは --reasoning-effort を付けない。
 """
 import argparse
 import gzip
@@ -60,9 +63,12 @@ def cmd_submit(args):
         requests = json.load(f)["requests"]
     chosen_requests, chosen = select(requests, args.persons, args.person_ids, args.skip)
     server = args.server.rstrip("/")
-    print(f"submitting {len(chosen_requests)} prompts ({len(chosen)} persons: {chosen[0]} ... {chosen[-1]})")
+    print(f"submitting {len(chosen_requests)} prompts ({len(chosen)} persons: {chosen[0]} ... {chosen[-1]}), "
+          f"enable_thinking={args.enable_thinking} reasoning_effort={args.reasoning_effort} max_tokens={args.max_tokens}")
     res = http("POST", f"{server}/jobs",
-               {"client_id": args.client_id, "sweep": args.sweep, "requests": chosen_requests})
+               {"client_id": args.client_id, "sweep": args.sweep, "enable_thinking": args.enable_thinking,
+                "reasoning_effort": args.reasoning_effort, "max_tokens": args.max_tokens,
+                "requests": chosen_requests})
     job_id = res["job_id"]
     print(f"job_id={job_id} created={res['created']}")
     if args.no_wait:
@@ -107,10 +113,24 @@ def print_token_stats(results):
     print(f"finish_reason: {reasons}")
 
 
-def load_results(path):
+def load_saved(path):
     opener = gzip.open if path.endswith(".gz") else open
     with opener(path, "rt", encoding="utf-8") as f:
-        return json.load(f)["results"]
+        return json.load(f)
+
+
+def load_results(path):
+    return load_saved(path)["results"]
+
+
+def job_conditions(saved):
+    """保存した結果の推論条件。ジョブごとに指定するようになる前の結果では None。"""
+    job = saved.get("job", {})
+    return job.get("enable_thinking"), job.get("reasoning_effort"), job.get("max_tokens")
+
+
+def format_conditions(cond):
+    return f"enable_thinking={cond[0]} reasoning_effort={cond[1]} max_tokens={cond[2]}"
 
 
 ANSWER = re.compile(r"<answer>\s*(\d+)\s*</answer>")
@@ -128,8 +148,15 @@ def cmd_stats(args):
 
 
 def cmd_compare(args):
-    a = {r["id"]: r for r in load_results(args.a)}
-    b = {r["id"]: r for r in load_results(args.b)}
+    saved_a, saved_b = load_saved(args.a), load_saved(args.b)
+    cond_a, cond_b = job_conditions(saved_a), job_conditions(saved_b)
+    print(f"A: {format_conditions(cond_a)}")
+    print(f"B: {format_conditions(cond_b)}")
+    # 推論条件が記録されていない（ジョブごとに指定するようになる前の）結果とは比べようがないので知らせない
+    if cond_a[0] is not None and cond_b[0] is not None and cond_a != cond_b:
+        print("note: the two results were generated with different conditions")
+    a = {r["id"]: r for r in saved_a["results"]}
+    b = {r["id"]: r for r in saved_b["results"]}
     common = sorted(set(a) & set(b))
     if not common:
         sys.exit("no common ids")
@@ -157,6 +184,9 @@ def main():
     s.add_argument("--requests", required=True, help="DumpPrompts の出力")
     s.add_argument("--client-id", required=True)
     s.add_argument("--sweep", type=int, required=True)
+    s.add_argument("--enable-thinking", required=True, choices=["true", "false"])
+    s.add_argument("--reasoning-effort", choices=["xhigh", "medium", "low"], help="思考ありのときは必須")
+    s.add_argument("--max-tokens", type=int, required=True)
     s.add_argument("--persons", type=int, help="先頭から何人分を投げるか（省略時は全員）")
     s.add_argument("--skip", type=int, default=0, help="先頭から何人を飛ばすか")
     s.add_argument("--person-ids", nargs="+", help="投げる人の person_id")
@@ -176,8 +206,12 @@ def main():
     st.set_defaults(func=cmd_stats)
 
     args = p.parse_args()
-    if args.command == "submit" and not args.no_wait and not args.out:
-        p.error("--out is required unless --no-wait")
+    if args.command == "submit":
+        if not args.no_wait and not args.out:
+            p.error("--out is required unless --no-wait")
+        args.enable_thinking = args.enable_thinking == "true"
+        if args.enable_thinking != (args.reasoning_effort is not None):
+            p.error("--reasoning-effort is required with --enable-thinking true and not allowed with false")
     args.func(args)
 
 

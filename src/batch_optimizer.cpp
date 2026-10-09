@@ -84,6 +84,20 @@ BatchOptimizerConfig loadBatchOptimizerConfig(const std::string& path) {
     BatchOptimizerConfig c;
     c.server_url = j.at("server_url").get<std::string>();
     c.client_id = j.at("client_id").get<std::string>();
+    c.enable_thinking = j.at("enable_thinking").get<bool>();
+    // 思考なしのとき、テンプレートは reasoning_effort を使わない。意味のない値を記録しないよう、書かせない
+    const bool has_effort = j.contains("reasoning_effort") && !j["reasoning_effort"].is_null();
+    if (c.enable_thinking) {
+        if (!has_effort) throw std::runtime_error("reasoning_effort is required when enable_thinking is true");
+        c.reasoning_effort = j["reasoning_effort"].get<std::string>();
+        if (c.reasoning_effort != "xhigh" && c.reasoning_effort != "medium" && c.reasoning_effort != "low") {
+            throw std::runtime_error("reasoning_effort must be xhigh, medium or low: " + c.reasoning_effort);
+        }
+    } else if (has_effort) {
+        throw std::runtime_error("remove reasoning_effort when enable_thinking is false (the template ignores it)");
+    }
+    c.max_tokens = j.at("max_tokens").get<int>();
+    if (c.max_tokens <= 0) throw std::runtime_error("max_tokens must be positive");
     c.sweeps = j.at("sweeps").get<int>();
     c.initial_temperature = j.at("initial_temperature").get<double>();
     c.final_temperature = j.at("final_temperature").get<double>();
@@ -115,6 +129,9 @@ void requireLfInputFiles(const BatchOptimizerConfig& c) {
 static json fixedSettings(const BatchOptimizerConfig& c) {
     return {
         {"client_id", c.client_id},
+        {"enable_thinking", c.enable_thinking},
+        {"reasoning_effort", c.enable_thinking ? json(c.reasoning_effort) : json(nullptr)},
+        {"max_tokens", c.max_tokens},
         {"sweeps", c.sweeps},
         {"initial_temperature", c.initial_temperature},
         {"final_temperature", c.final_temperature},
@@ -451,8 +468,9 @@ json reproducibleServerSettings(const json& info) {
         if (info.contains(key)) out[key] = info[key];
     }
     if (info.contains("engine")) {
-        // scheduler と cache（同時に処理する本数と推論用メモリの量）は、batch invariance がないと出力に影響する
-        for (const char* key : {"llm", "sampling", "enable_thinking", "reasoning_effort", "scheduler", "cache"}) {
+        // scheduler と cache（同時に処理する本数と推論用メモリの量）は、batch invariance がないと出力に影響する。
+        // enable_thinking・reasoning_effort・max_tokens はジョブごとに指定するので、設定ファイル側（fixedSettings）で比べる
+        for (const char* key : {"llm", "sampling", "enable_thinking", "scheduler", "cache"}) {
             if (info["engine"].contains(key)) out["engine"][key] = info["engine"][key];
         }
     }
@@ -466,7 +484,8 @@ JobStatus runJob(const BatchOptimizerConfig& c, JobClient& client, int sweep, co
     }
     // 既存のジョブがあっても投げる。サーバーは同じ内容なら既存の job_id を返し、違えば 409 になるので、
     // 再開時に変更案が前回と同じであることの確認にもなる
-    int job_id = client.submit(c.client_id, sweep, prompts);
+    const JobConditions conditions{c.enable_thinking, c.reasoning_effort, c.max_tokens};
+    int job_id = client.submit(c.client_id, sweep, conditions, prompts);
     std::cout << "[sweep " << sweep << "] job " << job_id << " (" << prompts.size() << " prompts)" << std::endl;
 
     int failures = 0;
@@ -476,13 +495,22 @@ JobStatus runJob(const BatchOptimizerConfig& c, JobClient& client, int sweep, co
             throw std::runtime_error("job " + std::to_string(job_id) + " belongs to client_id=" + st.client_id +
                                      " sweep=" + std::to_string(st.sweep));
         }
-        if (st.status == "done") return st;
+        if (st.status == "done") {
+            if (st.enable_thinking != c.enable_thinking || st.reasoning_effort != c.reasoning_effort ||
+                st.max_tokens != c.max_tokens) {
+                const std::string thinking = !st.enable_thinking ? "null" : (*st.enable_thinking ? "true" : "false");
+                throw std::runtime_error("job " + std::to_string(job_id) + " ran with enable_thinking=" + thinking +
+                                         " reasoning_effort=" + st.reasoning_effort +
+                                         " max_tokens=" + std::to_string(st.max_tokens) + ", not the configured ones");
+            }
+            return st;
+        }
         if (st.status == "failed") {
             ++failures;
             std::cerr << "[sweep " << sweep << "] job " << job_id << " failed (" << failures << "/"
                       << c.max_job_attempts << "):\n" << st.error << std::endl;
             if (failures >= c.max_job_attempts) throw std::runtime_error("job failed too many times");
-            client.submit(c.client_id, sweep, prompts); // failed のジョブは同じ job_id で再実行される
+            client.submit(c.client_id, sweep, conditions, prompts); // failed のジョブは同じ job_id で再実行される
             continue;
         }
         sleep_sec(c.poll_interval_sec);

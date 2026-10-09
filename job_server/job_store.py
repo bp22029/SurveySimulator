@@ -21,6 +21,9 @@ CREATE TABLE IF NOT EXISTS jobs (
     client_id    TEXT    NOT NULL,
     sweep        INTEGER NOT NULL,
     request_hash TEXT    NOT NULL,
+    enable_thinking  INTEGER,
+    reasoning_effort TEXT,
+    max_tokens   INTEGER,
     n_requests   INTEGER NOT NULL,
     status       TEXT    NOT NULL,
     attempts     INTEGER NOT NULL DEFAULT 0,
@@ -33,9 +36,22 @@ CREATE TABLE IF NOT EXISTS jobs (
 )
 """
 
+# 推論条件をジョブごとに受け取るようになる前の DB に足す列。それ以前のジョブでは NULL
+# （サーバー全体で思考あり・REASONING_EFFORT・MAX_TOKENS を固定していた。値は当時の server_info_*.json にある）
+ADDED_COLUMNS = {"enable_thinking": "INTEGER", "reasoning_effort": "TEXT", "max_tokens": "INTEGER"}
 
-def request_hash(requests: List[dict]) -> str:
-    canonical = json.dumps(requests, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+
+def request_hash(
+    requests: List[dict], enable_thinking: bool, reasoning_effort: Optional[str], max_tokens: int
+) -> str:
+    """ジョブの中身のハッシュ。推論条件も含めるので、同じ requests でも条件が違えば別の内容になる。"""
+    body = {
+        "enable_thinking": enable_thinking,
+        "reasoning_effort": reasoning_effort,
+        "max_tokens": max_tokens,
+        "requests": requests,
+    }
+    canonical = json.dumps(body, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
@@ -58,6 +74,10 @@ class JobStore:
         self._db.row_factory = sqlite3.Row
         self._db.execute("PRAGMA journal_mode=WAL")
         self._db.execute(SCHEMA)
+        columns = {r["name"] for r in self._db.execute("PRAGMA table_info(jobs)")}
+        for name, sql_type in ADDED_COLUMNS.items():
+            if name not in columns:
+                self._db.execute(f"ALTER TABLE jobs ADD COLUMN {name} {sql_type}")
 
     def close(self) -> None:
         self._db.close()
@@ -70,13 +90,22 @@ class JobStore:
 
     # --- 投入 -------------------------------------------------------------
 
-    def submit(self, client_id: str, sweep: int, requests: List[dict]) -> Tuple[int, bool]:
+    def submit(
+        self,
+        client_id: str,
+        sweep: int,
+        requests: List[dict],
+        enable_thinking: bool,
+        reasoning_effort: Optional[str],
+        max_tokens: int,
+    ) -> Tuple[int, bool]:
         """ジョブを登録し (job_id, 新規に作ったか) を返す。
 
-        同じ (client_id, sweep) が既にあれば、中身が同じなら既存の job_id を返す（POST のリトライで
-        二重登録しない）。failed のジョブなら queued に戻して再実行する。中身が違えば RequestMismatch。
+        同じ (client_id, sweep) が既にあれば、中身（requests と推論条件）が同じなら既存の job_id を返す
+        （POST のリトライで二重登録しない）。failed のジョブなら queued に戻して再実行する。
+        中身が違えば RequestMismatch。
         """
-        digest = request_hash(requests)
+        digest = request_hash(requests, enable_thinking, reasoning_effort, max_tokens)
         payload = gzip.compress(json.dumps(requests, ensure_ascii=False).encode("utf-8"))
         with self._lock:
             row = self._db.execute(
@@ -97,9 +126,10 @@ class JobStore:
             self._db.execute("BEGIN IMMEDIATE")
             try:
                 cur = self._db.execute(
-                    "INSERT INTO jobs (client_id, sweep, request_hash, n_requests, status, submitted_at)"
-                    " VALUES (?, ?, ?, ?, 'queued', ?)",
-                    (client_id, sweep, digest, len(requests), time.time()),
+                    "INSERT INTO jobs (client_id, sweep, request_hash, enable_thinking, reasoning_effort, max_tokens,"
+                    " n_requests, status, submitted_at) VALUES (?, ?, ?, ?, ?, ?, ?, 'queued', ?)",
+                    (client_id, sweep, digest, int(enable_thinking), reasoning_effort, max_tokens, len(requests),
+                     time.time()),
                 )
                 job_id = cur.lastrowid
                 _write_atomic(self.job_dir(job_id) / "request.json.gz", payload)
@@ -145,6 +175,9 @@ class JobStore:
             "job_id": job_id,
             "client_id": job["client_id"],
             "sweep": job["sweep"],
+            "enable_thinking": job["enable_thinking"],
+            "reasoning_effort": job["reasoning_effort"],
+            "max_tokens": job["max_tokens"],
             "status": "done",
             "n_requests": job["n_requests"],
             "n_length": n_length,
@@ -182,18 +215,26 @@ class JobStore:
             sql += " AND sweep = ?"
             params.append(sweep)
         with self._lock:
-            return [dict(r) for r in self._db.execute(sql + " ORDER BY job_id", params)]
+            return [_row(r) for r in self._db.execute(sql + " ORDER BY job_id", params)]
 
     def pending(self) -> List[dict]:
         with self._lock:
             rows = self._db.execute(
                 "SELECT * FROM jobs WHERE status IN ('running', 'queued') ORDER BY job_id"
             )
-            return [dict(r) for r in rows]
+            return [_row(r) for r in rows]
 
     def _get(self, job_id: int) -> Optional[dict]:
         row = self._db.execute("SELECT * FROM jobs WHERE job_id = ?", (job_id,)).fetchone()
-        return dict(row) if row else None
+        return _row(row) if row else None
+
+
+def _row(row: sqlite3.Row) -> dict:
+    job = dict(row)
+    # SQLite には真偽値がないので 0/1 で保存している
+    if job.get("enable_thinking") is not None:
+        job["enable_thinking"] = bool(job["enable_thinking"])
+    return job
 
 
 def _write_atomic(path: Path, data: bytes) -> None:

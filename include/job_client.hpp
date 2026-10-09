@@ -39,6 +39,13 @@ struct JobPrompt {
     std::string user_prompt;
 };
 
+// ジョブの推論条件。研究ごとに決め、1ジョブの中では全プロンプトで同じ値になる
+struct JobConditions {
+    bool enable_thinking = true;   // 思考の有無
+    std::string reasoning_effort;  // xhigh | medium | low。思考なしのときは空（null として送る）
+    int max_tokens = 0;            // 出力（思考を含む）のトークン数の上限
+};
+
 struct JobOutput {
     std::string id;
     std::string response;
@@ -49,6 +56,10 @@ struct JobStatus {
     int job_id = 0;
     std::string client_id;
     int sweep = 0;
+    // サーバーに記録された推論条件（条件を受け取るようになる前のジョブでは enable_thinking が空）
+    std::optional<bool> enable_thinking;
+    std::string reasoning_effort;
+    int max_tokens = 0;
     std::string status;        // queued | running | done | failed
     std::string error;         // failed のとき
     int n_length = 0;          // done のとき
@@ -69,7 +80,9 @@ public:
               std::function<void(int)> sleep_sec = nullptr);
 
     // ジョブを投入して job_id を返す。同じ (client_id, sweep) が既にあれば、サーバーは既存の job_id を返す
-    int submit(const std::string& client_id, int sweep, const std::vector<JobPrompt>& prompts);
+    // （中身と推論条件が違えば 409 で例外）
+    int submit(const std::string& client_id, int sweep, const JobConditions& conditions,
+               const std::vector<JobPrompt>& prompts);
 
     // (client_id, sweep) のジョブがあれば job_id を返す（クライアント再起動時の復旧用）
     std::optional<int> find(const std::string& client_id, int sweep);

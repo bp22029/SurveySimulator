@@ -1,6 +1,9 @@
 {
   "server_url": "http://192.168.130.XXX:8000",
   "client_id": "bp22029",
+  "enable_thinking": true,
+  "reasoning_effort": "medium",
+  "max_tokens": 8192,
   "sweeps": 50,
   "initial_temperature": 0.02034,
   "final_temperature": 0.002269,

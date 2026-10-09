@@ -39,14 +39,22 @@ class Worker(threading.Thread):
 
         job_id = job["job_id"]
         log.info(
-            "job start: job_id=%d client_id=%s sweep=%d n_requests=%d attempt=%d",
-            job_id, job["client_id"], job["sweep"], job["n_requests"], job["attempts"],
+            "job start: job_id=%d client_id=%s sweep=%d n_requests=%d"
+            " enable_thinking=%s reasoning_effort=%s max_tokens=%s attempt=%d",
+            job_id, job["client_id"], job["sweep"], job["n_requests"],
+            job["enable_thinking"], job["reasoning_effort"], job["max_tokens"], job["attempts"],
         )
         t0 = time.time()
         try:
+            if job["enable_thinking"] is None or job["max_tokens"] is None:
+                # 推論条件をジョブごとに受け取るようになる前に投入され、まだ終わっていないジョブ
+                raise RuntimeError("job has no enable_thinking/max_tokens; submit it again with a new sweep")
             requests = self.store.load_requests(job_id)
             completions = self.engine.generate(
-                [(r["system_prompt"], r["user_prompt"]) for r in requests]
+                [(r["system_prompt"], r["user_prompt"]) for r in requests],
+                enable_thinking=job["enable_thinking"],
+                reasoning_effort=job["reasoning_effort"],
+                max_tokens=job["max_tokens"],
             )
             if len(completions) != len(requests):
                 raise RuntimeError(

@@ -44,3 +44,26 @@ def test_compare_counts_text_and_final_answer_differences(tmp_path):
     assert "3_q: A=3 B=4" in res.stdout
 
     assert compare(a, a).returncode == 0
+
+
+def test_compare_shows_job_conditions(tmp_path):
+    a, b = tmp_path / "a.json", tmp_path / "b.json"
+    result = [{"id": "1_q", "response": "x</think><answer>1</answer>"}]
+    job_a = {"enable_thinking": True, "reasoning_effort": "medium", "max_tokens": 8192}
+    job_b = {"enable_thinking": True, "reasoning_effort": "medium", "max_tokens": 4096}
+    a.write_text(json.dumps({"job": job_a, "results": result}))
+    b.write_text(json.dumps({"job": job_b, "results": result}))
+    res = compare(a, b)
+    assert "A: enable_thinking=True reasoning_effort=medium max_tokens=8192" in res.stdout
+    assert "B: enable_thinking=True reasoning_effort=medium max_tokens=4096" in res.stdout
+    assert "different conditions" in res.stdout
+    assert res.returncode == 0  # 推論条件の違いは知らせるだけで、出力の比較結果は変えない
+
+
+def test_submit_requires_effort_only_with_thinking(tmp_path):
+    def submit(*extra):
+        return subprocess.run([sys.executable, str(VERIFY), "submit", "--server", "http://unused", "--requests", "x",
+                               "--client-id", "c", "--sweep", "1", "--max-tokens", "100", "--no-wait", *extra],
+                              capture_output=True, text=True, encoding="utf-8")
+    assert "required with --enable-thinking true" in submit("--enable-thinking", "true").stderr
+    assert "not allowed with false" in submit("--enable-thinking", "false", "--reasoning-effort", "low").stderr

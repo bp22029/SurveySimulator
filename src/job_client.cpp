@@ -94,18 +94,27 @@ HttpResponse JobClient::withRetry(const std::string& what, const std::function<H
     throw std::runtime_error(what + " failed after " + std::to_string(options_.max_attempts) + " attempts");
 }
 
-int JobClient::submit(const std::string& client_id, int sweep, const std::vector<JobPrompt>& prompts) {
+int JobClient::submit(const std::string& client_id, int sweep, const JobConditions& conditions,
+                      const std::vector<JobPrompt>& prompts) {
     json requests = json::array();
     for (const auto& p : prompts) {
         requests.push_back({{"id", p.id}, {"system_prompt", p.system_prompt}, {"user_prompt", p.user_prompt}});
     }
-    const std::string body = json{{"client_id", client_id}, {"sweep", sweep}, {"requests", requests}}.dump();
+    const std::string body = json{{"client_id", client_id},
+                                  {"sweep", sweep},
+                                  {"enable_thinking", conditions.enable_thinking},
+                                  {"reasoning_effort", conditions.enable_thinking
+                                                           ? json(conditions.reasoning_effort)
+                                                           : json(nullptr)},
+                                  {"max_tokens", conditions.max_tokens},
+                                  {"requests", requests}}
+                                 .dump();
 
     HttpResponse res = withRetry("POST /jobs", [&] {
         return transport_->postJson(base_url_ + "/jobs", body, options_.post_timeout_sec);
     });
     if (res.status == 409) {
-        // 同じ周に別の内容のジョブがある。乱数や設定が前回と食い違っている
+        // 同じ周に別の内容のジョブがある。乱数や設定（推論条件を含む）が前回と食い違っている
         throw std::runtime_error("POST /jobs: a different job already exists for client_id=" + client_id +
                                  " sweep=" + std::to_string(sweep) + ": " + res.body);
     }
@@ -139,6 +148,13 @@ JobStatus JobClient::get(int job_id) {
     st.job_id = j.at("job_id").get<int>();
     st.client_id = j.at("client_id").get<std::string>();
     st.sweep = j.at("sweep").get<int>();
+    if (j.contains("enable_thinking") && j["enable_thinking"].is_boolean()) {
+        st.enable_thinking = j["enable_thinking"].get<bool>();
+    }
+    if (j.contains("reasoning_effort") && j["reasoning_effort"].is_string()) {
+        st.reasoning_effort = j["reasoning_effort"].get<std::string>();
+    }
+    if (j.contains("max_tokens") && j["max_tokens"].is_number_integer()) st.max_tokens = j["max_tokens"].get<int>();
     st.status = j.at("status").get<std::string>();
     if (j.contains("error") && j["error"].is_string()) st.error = j["error"].get<std::string>();
     if (st.status == "done") {

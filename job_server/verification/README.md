@@ -12,7 +12,7 @@
 | サーバー | job_server commit `3ca8f02`（一式で送付、`git.dirty: false`） |
 | 環境 | vLLM 0.30.0、torch 2.13.0+cu132、transformers 5.18.0、RTX PRO 6000 Blackwell Max-Q（ドライバ 615.71.09） |
 | モデル | `Qwen/Qwen3.8-27B` @ `1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0` |
-| 推論設定 | `REASONING_EFFORT=medium`（起動時に指定）、temperature 0、`MAX_TOKENS` 8192、`MAX_MODEL_LEN` 16384、`GPU_MEMORY_UTILIZATION` 0.9、`enforce_eager: true`、`VLLM_BATCH_INVARIANT=0` |
+| 推論設定 | `REASONING_EFFORT=medium`（起動時に指定）、temperature 0、`MAX_TOKENS` 8192（当時はサーバー全体の設定。現在はジョブごとに `--enable-thinking true --reasoning-effort medium --max-tokens 8192` と指定するのと同じ）、`MAX_MODEL_LEN` 16384、`GPU_MEMORY_UTILIZATION` 0.9、`enforce_eager: true`、`VLLM_BATCH_INVARIANT=0` |
 | スケジューラ | `max_num_seqs` 1024、`max_num_batched_tokens` 16384、`num_gpu_blocks` 648（再起動の前後で同じ） |
 | 入力 | `config/batch_optimizer.example.json`（`forQwen/qwen_bfi2.txt`、初期個性 seed 42）の `DumpPrompts` 出力の先頭20人（person_id 114467207〜114467226、1,020件） |
 
@@ -42,9 +42,14 @@
 
 ```bash
 V="python3 job_server/tools/verify.py"
-$V submit --server $SERVER --requests requests.json --client-id verify --sweep <未使用の番号> --persons 20 --out r_check.json
+$V submit --server $SERVER --requests requests.json --enable-thinking true --reasoning-effort medium --max-tokens 8192 \
+    --client-id verify --sweep <未使用の番号> --persons 20 --out r_check.json
 $V compare job_server/verification/2026-10-08_medium/r1.json.gz r_check.json
 ```
 
 `requests.json` は `config/batch_optimizer.example.json` から作ったもの（プロンプトを変えると一致しない）。
 `client_id` と `sweep` の組はジョブごとに一意なので、すでに使った sweep（verify は 1〜5）は避ける。
+r1・r5 の保存ファイルには推論条件が入っていないので、`compare` では `enable_thinking=None` と表示される。
+
+推論条件をジョブごとに受け取るようにした変更（2026-10-09）で、サーバーのコードが変わった。推論の呼び出し方は同じだが、
+新しい一式を送ったら上のコマンドで r1 と一致することを確かめてから本番に進む。

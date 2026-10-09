@@ -26,6 +26,10 @@ using Answers = TaeTracker::Answers;
 struct BatchOptimizerConfig {
     std::string server_url;          // 例: http://192.168.130.XXX:8000
     std::string client_id;           // 例: bp22029
+    // 推論条件（研究ごとに決める。最適化の途中では変えない。省略不可）
+    bool enable_thinking = true;     // 思考の有無
+    std::string reasoning_effort;    // xhigh | medium | low。思考なしのときは書かない（空）
+    int max_tokens = 0;              // 出力（思考を含む）のトークン数の上限
     int sweeps = 0;                  // 周回数 S
     double initial_temperature = 0.0;
     double final_temperature = 0.0;

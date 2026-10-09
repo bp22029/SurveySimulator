@@ -40,8 +40,8 @@ C++（BatchOptimizer）と検証用のプロンプト作成は実験用PC で行
 | 構造 | 64層のうち48層が線形注意（Gated DeltaNet）、16層が通常の注意。MoE ではない（Dense） |
 | 種類 | 画像・動画も扱える視覚言語モデル（`Qwen3_5ForConditionalGeneration`）。テキストだけ使うので `language_model_only=True` で画像エンコーダを読み込まない |
 | 要件 | transformers 5.8.0 以上、vLLM 0.17.0 以上（vLLM の Qwen3.8 レシピ） |
-| 思考モード | 既定で ON。生成プロンプトの末尾に `<think>\n` が付き、出力は思考 → `</think>` → 回答の順 |
-| `reasoning_effort` | `xhigh`（既定）・`medium`・`low`。`xhigh` と `low` はシステムプロンプトの先頭に英語の指示文を足す。`medium` は何も足さない（§7） |
+| 思考モード | 既定で ON。生成プロンプトの末尾に `<think>\n` が付き、出力は思考 → `</think>` → 回答の順。`enable_thinking=false` では末尾が空の `<think>\n\n</think>\n\n` になり、出力は回答だけ（`reasoning_effort` は使われない）。クライアントがジョブごとに指定する（§7） |
+| `reasoning_effort` | `xhigh`（既定）・`medium`・`low`。思考ありのときだけ使われる。`xhigh` と `low` はシステムプロンプトの先頭に英語の指示文を足す。`medium` は何も足さない。クライアントがジョブごとに指定する（§7） |
 | 推奨サンプリング | 思考モードは temperature=1.0, top_p=0.95, top_k=20。本研究は再現性のため temperature=0 にする（設計書 §3.2）ので、`finish_reason == "length"` を監視する |
 | MTP | 投機的デコーディング用の層があるが、使わない（`speculative_config` を指定しない） |
 
@@ -53,9 +53,12 @@ C++（BatchOptimizer）と検証用のプロンプト作成は実験用PC で行
   再起動では完全に同じ結果になった（2026-10-08、§10 の検証1〜3）が、ある人の回答は同じジョブの他の人の内容にも
   左右される（検証4：1人だけのジョブにすると51件中9件で回答番号が変わった）。論文にはこの性質を書く。
   結果は [verification/README.md](verification/README.md)
-- 同時に処理する本数を決める設定（`GPU_MEMORY_UTILIZATION`・`MAX_TOKENS`・`MAX_MODEL_LEN`）も出力に影響するので、
-  検証の前に決めて以降は変えない。`GET /info` の `engine.scheduler`・`engine.cache` に記録され、`BatchOptimizer` は再開時に
-  これが変わっていたら止まる
+- 同時に処理する本数を決めるエンジンの設定（`GPU_MEMORY_UTILIZATION`・`MAX_MODEL_LEN`）も出力に影響するので、
+  検証の前に決めて以降は変えない（2人とも影響を受ける）。`GET /info` の `engine.scheduler`・`engine.cache` に記録され、
+  `BatchOptimizer` は再開時にこれが変わっていたら止まる
+- `enable_thinking`・`reasoning_effort`・`max_tokens` はジョブごとの推論条件で、クライアントが指定する（§7）。1ジョブの中では
+  全プロンプトで同じ値になる。思考の有無や effort が違えば入力（プロンプト）も出力も変わるので、最適化の結果は条件ごとに別物になる。
+  `max_tokens` を変えても、打ち切られない回答の出力が変わらないかは未確認（§10.7）
 
 ---
 
@@ -248,40 +251,47 @@ uv run --no-project --with "transformers>=5.8" --with jinja2 python job_server/t
 
 - 置き場所は `env.sh`（`~/llmsrv` の中）で決まるので、`start_server.sh` に設定はない
 - `MODEL`・`REVISION`：設定済み
-- `REASONING_EFFORT`：§7 で決めて書き込む。決まるまでの動作確認と検証では、ファイルは変えずに
-  起動時に `REASONING_EFFORT=medium bash start_server.sh` のように指定する
+- `MAX_MODEL_LEN`・`GPU_MEMORY_UTILIZATION`：設定済み。2人で共有するエンジンの設定なので、変えるときは合意のうえで
 
-起動時に上書きした値も `GET /info` に記録され、`BatchOptimizer` は再開時にこれが変わっていたら止まる。
+`enable_thinking`・`reasoning_effort`・`max_tokens` は `start_server.sh` にはない。クライアントがジョブごとに指定する
+（`BatchOptimizer` は設定ファイル、`verify.py` は `--enable-thinking`・`--reasoning-effort`・`--max-tokens`）。
 
 ---
 
-## 7. reasoning_effort を決める（研究上の判断）
+## 7. 思考の有無・reasoning_effort・max_tokens を決める（研究ごとの判断）
 
-| 値 | システムプロンプトへの追加 | 想定される影響 |
+それぞれの研究で決め、`BatchOptimizer` の設定ファイルの `enable_thinking`・`reasoning_effort`・`max_tokens` に書く。
+サーバーを起動し直す必要はなく、2人が別の値を使ってもよい（ジョブは1つずつ実行されるので互いに影響しない）。
+
+| `enable_thinking` / `reasoning_effort` | プロンプトへの追加 | 想定される影響 |
 |---|---|---|
-| `xhigh`（モデルの既定） | 先頭に "Reasoning effort is set to xhigh. Please think carefully..." | 思考が最も長い。`MAX_TOKENS` で打ち切られる回答が増え、時間もかかる |
-| `medium` | なし（昨年と同じく、こちらのシステムプロンプトだけ） | 中間 |
-| `low` | 先頭に "Reasoning effort is set to low. Keep your thinking brief..." | 思考が最も短い |
+| `false`（`reasoning_effort` は書かない） | 生成プロンプトの末尾に空の `<think>\n\n</think>\n\n` | 思考せずに回答する。最も速い。システムプロンプトで `<think>` を書かせる指示（`forQwen/qwen_bfi2.txt`）とは合わないので、`forQwen38/qwen38_bfi2.txt` を使う |
+| `true` / `xhigh`（モデルの既定） | 先頭に "Reasoning effort is set to xhigh. Please think carefully..." | 思考が最も長い。`max_tokens` で打ち切られる回答が増え、時間もかかる |
+| `true` / `medium` | なし（昨年と同じく、こちらのシステムプロンプトだけ） | 中間 |
+| `true` / `low` | 先頭に "Reasoning effort is set to low. Keep your thinking brief..." | 思考が最も短い |
 
 - どれを選んでも温度0で再現性は保てるが、回答の分布と所要時間が変わる。最適化の途中では変えない
+  （`BatchOptimizer` は設定ファイルの値がチェックポイントと違えば止まる）
+- 最適化した個性は、その条件で推論したときに合うように調整されたもの。最適化した個性を使う実験でも、
+  思考の有無と effort はできるだけ揃える（温度など揃えられない条件があれば、論文に書く）
+- 思考なしの場合も §10 の検証（特に検証1〜3）をその条件で行う
 - 判断材料として、§10 の検証で使う20人分を各設定で1回ずつ流し、`n_length`（打ち切り件数）と所要時間を比べるとよい（§10.6）
-- 決めたら `start_server.sh` に設定して commit し、設計書 §8 と論文の記載に残す
+- 決めたら設計書 §8 と論文の記載に残す
 
 補足：システムプロンプト（`qwen_bfi2.txt`）は出力形式として `<think>…</think><answer>…</answer>` を指示しているが、
 Qwen3.8 はモデル自体が `<think>` から書き始める。C++ 側は「最後の `</think>` の後の、最後の `<answer>`」を回答として
-取り出すので、どちらの書き方でも読み取れる。プロンプトを変えるかどうかは別途判断する。
+取り出す（`</think>` がなければ出力全体から探す）ので、どの書き方でも読み取れる。プロンプトを変えるかどうかは別途判断する。
 
 ---
 
 ## 8. 起動 [Blackwell]
 
-SSH が切れても止まらないように、tmux の中で起動する（`REASONING_EFFORT` が `start_server.sh` に
-まだ書かれていない間は、起動時に指定する：§6）：
+SSH が切れても止まらないように、tmux の中で起動する：
 
 ```bash
 tmux new -s job_server
 cd ~/llmsrv/job_server
-REASONING_EFFORT=medium bash start_server.sh
+bash start_server.sh
 ```
 
 tmux から抜けるときは `Ctrl-b` → `d`。戻るときは `tmux attach -t job_server`。
@@ -290,7 +300,7 @@ tmux が入っておらず入れられない場合は、`nohup` で起動する�
 
 ```bash
 cd ~/llmsrv/job_server
-REASONING_EFFORT=medium nohup bash start_server.sh > /dev/null 2>&1 &
+nohup bash start_server.sh > /dev/null 2>&1 &
 tail -f ~/llmsrv/data/logs/server_*.log      # 見終わったら Ctrl-c（サーバーは止まらない）
 # 止めるとき
 pkill -INT -f "python server.py"
@@ -299,7 +309,7 @@ pkill -INT -f "python server.py"
 確認（起動ログ）：
 
 - `server info:` の JSON に、vLLM・torch・transformers のバージョン、GPU、`model`・`revision`、
-  `engine.reasoning_effort`、`engine.chat_template_sample` が出ている
+  `engine.chat_template_sample`（reasoning_effort ごとと思考なしの適用例）が出ている
 - `git` が `"source": "package"`、`"commit"` が送った一式の commit、`"dirty": false`
 - `kv_cache_tokens`・`scheduler`（`max_num_seqs` など）・`cache`（`num_gpu_blocks` など）に数値が出ている
   （`null` なら vLLM の内部の場所が変わっただけで、動作には影響しない）。起動のたびに同じ値になることを確認する
@@ -316,19 +326,24 @@ curl -s localhost:8000/info | python3 -m json.tool | head -80
 
 止めるとき：tmux の中で `Ctrl-c`。実行中のジョブは、次の起動時に自動で再実行される。
 
-### 8.1 MAX_TOKENS を決める
+### 8.1 max_tokens を決める
 
-`MAX_TOKENS=8192` は仮の値。§10.1 で作る `requests.json` から5人分（255件）を流し、出力トークン数の分布を見て確定する。
+使う推論条件（思考の有無・reasoning_effort）ごとに決める（研究ごと。§7）。§10.1 で作る `requests.json` から5人分（255件）を、
+大きめの `max_tokens` で流し、出力トークン数の分布を見て決める。
 先に §9（実験用PC から 8000 番に届くこと）と §10.1（`requests.json`、`SERVER`・`V` の設定）を済ませておく：
 
 ```bash
-$V submit --server $SERVER --requests requests.json --client-id tune --sweep 1 --persons 5 --out tune.json
+$V submit --server $SERVER --requests requests.json --enable-thinking true --reasoning-effort medium --max-tokens 12000 \
+    --client-id tune --sweep 1 --persons 5 --out tune.json
 # 結果の最後に output tokens: mean / p50 / p90 / p99 / max と、各長さを超えた割合、finish_reason の内訳が出る
 ```
 
 - `finish_reason` の `length`（打ち切り）がほとんどなく、p99 に十分な余裕がある値にする
 - 打ち切られた回答の多くが同じ文の繰り返し（温度0で起きやすい）なら、上げても改善しないので、それ以上は上げない
-- 決めた値は `start_server.sh` に書いて commit し、一式を送り直してから §10 の検証に進む（`MAX_MODEL_LEN` はプロンプト約0.7k＋`MAX_TOKENS` 以上）
+- 決めた値は `BatchOptimizer` の設定ファイルの `max_tokens` に書く。プロンプト（約0.7k）＋ `max_tokens` が
+  `MAX_MODEL_LEN`（16384）を超えるジョブは、サーバーが推論せずに failed にする
+- 思考なしなら `--enable-thinking false` とし、`--reasoning-effort` は付けない
+- 別の条件・別の値を試すときは、`--client-id` か `--sweep` を変える（同じ組で条件だけ変えると HTTP 409）
 
 ---
 
@@ -362,6 +377,8 @@ curl -s http://localhost:8000/queue
 本番の前に行う。全員分（20,553件）を毎回流すと時間がかかるので、まず20人分（1,020件）で行う。
 結果は `verification/` に記録する（2026-10-08 の reasoning_effort=medium の結果：[verification/README.md](verification/README.md)）。
 `compare` は全文の一致と、最終回答（C++ と同じく最後の `</think>` の後の最後の `<answer>`）の違いを表示する。
+サーバーには `client_id` と `sweep` の組ごとにジョブが残るので、やり直すときは `--client-id verify2` のように変える
+（2026-10-08 の検証で `verify` の sweep 1〜5 と `verify-b` の 1〜2 は使用済み）。
 
 ### 10.1 プロンプトの用意 [実験用PC]
 
@@ -380,13 +397,14 @@ docker compose run --rm simulator ./build/src/DumpPrompts config/batch_optimizer
 ```bash
 SERVER=http://<BlackwellのIP>:8000
 V="python3 job_server/tools/verify.py"
+C="--enable-thinking true --reasoning-effort medium --max-tokens 8192"   # 検証する推論条件（比べる結果どうしで揃える）
 ```
 
 ### 10.2 検証1：同じ入力を2回
 
 ```bash
-$V submit --server $SERVER --requests requests.json --client-id verify --sweep 1 --persons 20 --out r1.json
-$V submit --server $SERVER --requests requests.json --client-id verify --sweep 2 --persons 20 --out r2.json
+$V submit --server $SERVER --requests requests.json $C --client-id verify --sweep 1 --persons 20 --out r1.json
+$V submit --server $SERVER --requests requests.json $C --client-id verify --sweep 2 --persons 20 --out r2.json
 $V compare r1.json r2.json
 ```
 
@@ -395,9 +413,9 @@ $V compare r1.json r2.json
 ### 10.3 検証2：他のクライアントのジョブを挟む
 
 ```bash
-$V submit --server $SERVER --requests requests.json --client-id verify-b --sweep 1 --skip 20 --persons 10 --no-wait
-$V submit --server $SERVER --requests requests.json --client-id verify --sweep 3 --persons 20 --out r3.json
-$V submit --server $SERVER --requests requests.json --client-id verify-b --sweep 2 --skip 30 --persons 10 --no-wait
+$V submit --server $SERVER --requests requests.json $C --client-id verify-b --sweep 1 --skip 20 --persons 10 --no-wait
+$V submit --server $SERVER --requests requests.json $C --client-id verify --sweep 3 --persons 20 --out r3.json
+$V submit --server $SERVER --requests requests.json $C --client-id verify-b --sweep 2 --skip 30 --persons 10 --no-wait
 $V compare r1.json r3.json
 ```
 
@@ -408,7 +426,7 @@ $V compare r1.json r3.json
 §8 の方法でサーバーを止めて起動し直してから：
 
 ```bash
-$V submit --server $SERVER --requests requests.json --client-id verify --sweep 4 --persons 20 --out r4.json
+$V submit --server $SERVER --requests requests.json $C --client-id verify --sweep 4 --persons 20 --out r4.json
 $V compare r1.json r4.json
 ```
 
@@ -421,7 +439,7 @@ $V compare r1.json r4.json
 
 ```bash
 PID=$(python3 -c "import json;print(json.load(open('r1.json'))['results'][0]['id'].split('_')[0])")
-$V submit --server $SERVER --requests requests.json --client-id verify --sweep 5 --person-ids $PID --out r5.json
+$V submit --server $SERVER --requests requests.json $C --client-id verify --sweep 5 --person-ids $PID --out r5.json
 $V compare r1.json r5.json
 ```
 
@@ -435,16 +453,29 @@ batch invariance を使えない（§0）ので、一致しない見込み。ど
 
 - 全員分を1ジョブで流す（数時間かかる見込み。夜間に）：
   ```bash
-  $V submit --server $SERVER --requests requests.json --client-id verify --sweep 10 --out r_full.json
+  $V submit --server $SERVER --requests requests.json $C --client-id verify --sweep 10 --out r_full.json
   ```
 - 1人ずつ流した場合の目安（5人分を個別のジョブで流し、`s/person` を403倍する）：
   ```bash
   for i in 0 1 2 3 4; do
-    $V submit --server $SERVER --requests requests.json --client-id verify --sweep $((20+i)) --skip $i --persons 1 --out r_single_$i.json
+    $V submit --server $SERVER --requests requests.json $C --client-id verify --sweep $((20+i)) --skip $i --persons 1 --out r_single_$i.json
   done
   ```
-- reasoning_effort の比較（§7）：`REASONING_EFFORT=xhigh bash start_server.sh` などで起動し直し、
-  `--client-id verify-xhigh` などとして20人分を流し、`n_length` と `elapsed` を比べる
+- 推論条件の比較（§7）：サーバーはそのままで、`--enable-thinking true --reasoning-effort xhigh --client-id verify-xhigh`、
+  `--enable-thinking false --client-id verify-nothink` などとして
+  20人分を流し、`n_length` と `elapsed` を比べる
+
+### 10.7 検証6：max_tokens の上限だけを変える
+
+打ち切りが起きない範囲では、`max_tokens` を変えても出力は変わらない見込みだが、batch invariance がないので確かめる：
+
+```bash
+$V submit --server $SERVER --requests requests.json --enable-thinking true --reasoning-effort medium --max-tokens 4096 \
+    --client-id verify --sweep 6 --persons 20 --out r6.json
+$V compare r1.json r6.json
+```
+
+`different: 0` なら、打ち切りのない effort では `max_tokens` の値は結果に影響しないと言える（どちらの結果も `n_length` が0のとき）。
 
 検証の記録には、各回の `GET /info`（`~/llmsrv/data/jobs/server_info_*.json`）を添える。
 
@@ -452,9 +483,9 @@ batch invariance を使えない（§0）ので、一致しない見込み。ど
 
 ## 11. 本番の前に
 
-- [ ] `start_server.sh` の `REASONING_EFFORT` を決めて commit し、その commit の一式を送り直した（§2）
-- [ ] `MAX_TOKENS` を §8.1 で決め、`MAX_MODEL_LEN`・`GPU_MEMORY_UTILIZATION` と合わせて commit した（以降は変えない）
-- [ ] 起動時に上書き（`REASONING_EFFORT=...`）をせずに起動した。`GET /info` の `git.dirty` が `false`
+- [ ] サーバーに最新の一式を送り直した（§2）。`GET /info` の `git.dirty` が `false`
+- [ ] `MAX_MODEL_LEN`・`GPU_MEMORY_UTILIZATION` を2人で確認した（以降は変えない）
+- [ ] 各自の研究で `enable_thinking`・`reasoning_effort`（§7）と `max_tokens`（§8.1）を決め、設定ファイルに書いた
 - [ ] §10 の検証1〜3が合格。検証4・5の結果を設計書 §5 に記録した
 - [ ] SA の初期温度・終了温度・周回数を決めた（設計書 §8）
 - [ ] 2人それぞれの設定ファイル（`config/batch_optimizer.example.json` をコピー）で、`client_id` と `run_dir` が別
@@ -478,7 +509,9 @@ docker compose run --rm simulator ./build/src/BatchOptimizer my_config.json
 | `unexpected keyword argument 'language_model_only'` | その vLLM では使えない。手元で `engine.py` の `language_model_only=True` の行を外して commit し、一式を送り直す（画像エンコーダの分だけメモリを使う） |
 | 起動時に CUDA out of memory | `GPU_MEMORY_UTILIZATION` は上げすぎない（他の利用者がいないか `nvidia-smi` で確認）。`MAX_MODEL_LEN` を下げる前に相談する |
 | `VLLM batch_invariant mode is not supported for GDN_ATTN` | `VLLM_BATCH_INVARIANT=1` で起動した。このモデルでは使えないので `0` にする（`start_server.sh` は `0` に固定済み） |
-| `n_length` が多い | `MAX_TOKENS` で思考が打ち切られている。§8.1 で分布を見て、reasoning_effort を下げるか `MAX_TOKENS` を上げる（2人で合意のうえで。最適化の途中では変えない） |
+| `n_length` が多い | `max_tokens` で思考が打ち切られている。§8.1 で分布を見て、reasoning_effort を下げるか `max_tokens` を上げる（設定ファイルで。最適化の途中では変えない） |
+| ジョブが `max_tokens ... exceeds max_model_len` で failed | プロンプト＋`max_tokens` が `MAX_MODEL_LEN` を超えている。`max_tokens` を下げる |
+| `job has no enable_thinking/max_tokens` で failed | 推論条件をジョブごとに受け取るようになる前に投入され、まだ終わっていなかったジョブ。新しい `sweep` で投げ直す |
 | 起動のたびに `engine.cache.num_gpu_blocks` が違う | 起動時に他のプロセスが GPU メモリを使っていた。`nvidia-smi` で確認し、空いているときに起動し直す |
 | `HTTP 409` | 同じ `client_id` と `sweep` で別の内容をすでに投げている。検証では `sweep` を変える |
 | `GET /info` の `git.dirty` が `true` | Blackwell 機の上で `~/llmsrv/job_server/` のファイルが書き換えられている（`modified` に一覧）。手元で直して一式を送り直す |

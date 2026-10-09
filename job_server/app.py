@@ -1,22 +1,23 @@
 """ジョブ方式の API（設計書 §3.4）。推論はここでは行わず、Worker に任せる。"""
 import gzip
-from typing import Callable, List, Optional
+from typing import Callable, List, Literal, Optional
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, field_validator, model_validator
 
 from job_store import JobStore, RequestMismatch
 
 # 応答に載せるジョブの項目（内部の request_hash などは出さない）
 PUBLIC_FIELDS = (
-    "job_id", "client_id", "sweep", "status", "n_requests", "n_length",
+    "job_id", "client_id", "sweep", "enable_thinking", "reasoning_effort", "max_tokens",
+    "status", "n_requests", "n_length",
     "attempts", "submitted_at", "started_at", "finished_at",
 )
 
 
 class PromptRequest(BaseModel):
-    # 未知の項目（temperature など）は拒否する。サンプリング設定はサーバー側で固定（設計書 §7）
+    # 未知の項目（temperature など）は拒否する。temperature などはサーバー側で固定（設計書 §7）
     model_config = ConfigDict(extra="forbid")
 
     id: str = Field(min_length=1)
@@ -29,6 +30,12 @@ class JobSubmission(BaseModel):
 
     client_id: str = Field(min_length=1, max_length=64)
     sweep: int = Field(ge=0)
+    # 推論条件は研究ごとに決めるので、ジョブごとに必ず指定してもらう（既定値は置かない）。
+    # 1ジョブの中では全リクエストで同じ値になる
+    enable_thinking: StrictBool  # "true" や 1 を真偽値に読み替えない
+    # 思考ありのときは必須。思考なしのときはテンプレートが使わないので、指定しない（null）
+    reasoning_effort: Optional[Literal["xhigh", "medium", "low"]] = None
+    max_tokens: int = Field(ge=1)
     requests: List[PromptRequest] = Field(min_length=1)
 
     @field_validator("requests")
@@ -41,6 +48,14 @@ class JobSubmission(BaseModel):
             seen.add(r.id)
         return requests
 
+    @model_validator(mode="after")
+    def effort_only_with_thinking(self) -> "JobSubmission":
+        if self.enable_thinking and self.reasoning_effort is None:
+            raise ValueError("reasoning_effort is required when enable_thinking is true")
+        if not self.enable_thinking and self.reasoning_effort is not None:
+            raise ValueError("reasoning_effort must be null when enable_thinking is false (the template ignores it)")
+        return self
+
 
 def public(job: dict) -> dict:
     out = {k: job[k] for k in PUBLIC_FIELDS}
@@ -49,19 +64,30 @@ def public(job: dict) -> dict:
     return out
 
 
-def create_app(store: JobStore, notify: Callable[[], None], server_info: dict) -> FastAPI:
+def create_app(
+    store: JobStore, notify: Callable[[], None], server_info: dict, max_model_len: Optional[int] = None
+) -> FastAPI:
     app = FastAPI(title="SurveySimulator LLM job server")
 
     @app.post("/jobs")
     def submit_job(submission: JobSubmission):
+        # プロンプトの長さを含めた確認は推論の直前に行う（engine.py）。ここでは明らかに収まらないものを断る
+        if max_model_len is not None and submission.max_tokens >= max_model_len:
+            raise HTTPException(
+                status_code=422,
+                detail=f"max_tokens ({submission.max_tokens}) must be less than max_model_len ({max_model_len})",
+            )
         requests = [r.model_dump() for r in submission.requests]
         try:
-            job_id, created = store.submit(submission.client_id, submission.sweep, requests)
+            job_id, created = store.submit(
+                submission.client_id, submission.sweep, requests,
+                submission.enable_thinking, submission.reasoning_effort, submission.max_tokens,
+            )
         except RequestMismatch as e:
             raise HTTPException(
                 status_code=409,
                 detail=f"job {e.job_id} already exists for client_id={submission.client_id}"
-                f" sweep={submission.sweep} with different requests",
+                f" sweep={submission.sweep} with different requests or conditions (enable_thinking/reasoning_effort/max_tokens)",
             )
         notify()
         return {"job_id": job_id, "created": created}

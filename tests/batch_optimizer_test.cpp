@@ -348,7 +348,9 @@ public:
     std::string model = "fake-model";
     int fail_post_for_sweep = -1;  // この周の POST で「クライアントが落ちた」ことにする
     int fail_job_once_for_sweep = -1;
+    std::string override_reasoning_effort;  // 空でなければ、GET で返す推論条件をこれにする（サーバーの異常）
     int posts = 0;
+    std::vector<json> post_conditions;      // POST で受け取った推論条件
 
     HttpResponse postJson(const std::string& url, const std::string& body, long) override {
         json j = json::parse(body);
@@ -358,15 +360,22 @@ public:
             throw std::runtime_error("simulated client crash");
         }
         ++posts;
+        post_conditions.push_back({{"enable_thinking", j.at("enable_thinking")},
+                                   {"reasoning_effort", j.at("reasoning_effort")},
+                                   {"max_tokens", j.at("max_tokens")}});
         std::string key = j["client_id"].get<std::string>() + "#" + std::to_string(sweep);
         auto it = by_key_.find(key);
         if (it != by_key_.end()) {
             Job& job = jobs_[it->second - 1];
-            if (job.requests != j["requests"]) return {409, "{\"detail\":\"mismatch\"}", ""};
+            if (job.requests != j["requests"] || job.enable_thinking != j["enable_thinking"] ||
+                job.reasoning_effort != j["reasoning_effort"] || job.max_tokens != j["max_tokens"]) {
+                return {409, "{\"detail\":\"mismatch\"}", ""};
+            }
             if (job.status == "failed") job.status = "done";
             return {200, json{{"job_id", job.id}, {"created", false}}.dump(), ""};
         }
-        Job job{static_cast<int>(jobs_.size()) + 1, j["client_id"], sweep, j["requests"], "done"};
+        Job job{static_cast<int>(jobs_.size()) + 1, j["client_id"], sweep, j["enable_thinking"],
+                j["reasoning_effort"], j["max_tokens"], j["requests"], "done"};
         if (sweep == fail_job_once_for_sweep) {
             fail_job_once_for_sweep = -1;
             job.status = "failed";
@@ -391,7 +400,14 @@ public:
         }
         int id = std::stoi(url.substr(url.rfind('/') + 1));
         const Job& job = jobs_.at(id - 1);
-        json body = {{"job_id", job.id}, {"client_id", job.client_id}, {"sweep", job.sweep}, {"status", job.status}};
+        json body = {{"job_id", job.id},
+                     {"client_id", job.client_id},
+                     {"sweep", job.sweep},
+                     {"enable_thinking", job.enable_thinking},
+                     {"reasoning_effort", override_reasoning_effort.empty() ? job.reasoning_effort
+                                                                            : json(override_reasoning_effort)},
+                     {"max_tokens", job.max_tokens},
+                     {"status", job.status}};
         if (job.status == "failed") body["error"] = "CUDA error (simulated)";
         if (job.status == "done") {
             json results = json::array();
@@ -413,6 +429,9 @@ private:
         int id;
         std::string client_id;
         int sweep;
+        bool enable_thinking;
+        json reasoning_effort;  // 思考なしのときは null
+        int max_tokens;
         json requests;
         std::string status;
     };
@@ -462,6 +481,9 @@ protected:
         BatchOptimizerConfig c;
         c.server_url = "http://fake";
         c.client_id = "tester";
+        c.enable_thinking = true;
+        c.reasoning_effort = "medium";
+        c.max_tokens = 8192;
         c.sweeps = 4;
         c.initial_temperature = 0.05;
         c.final_temperature = 0.005;
@@ -624,4 +646,102 @@ TEST_F(BatchRunTest, RefusesToResumeWhenServerModelChanged) {
 
     server->model = "another-model";
     EXPECT_THROW(runBatchOptimization(c, cl, noSleep), std::runtime_error);
+}
+
+TEST_F(BatchRunTest, SendsConfiguredConditionsWithEveryJob) {
+    auto c = config("conditions");
+    c.sweeps = 2;
+    c.reasoning_effort = "low";
+    c.max_tokens = 4096;
+    auto server = std::make_shared<FakeJobServer>();
+    auto cl = client(server);
+    runBatchOptimization(c, cl, noSleep);
+    ASSERT_EQ(server->post_conditions.size(), 3u);
+    for (const auto& cond : server->post_conditions) {
+        EXPECT_EQ(cond, (json{{"enable_thinking", true}, {"reasoning_effort", "low"}, {"max_tokens", 4096}}));
+    }
+}
+
+TEST_F(BatchRunTest, SendsNullEffortWithoutThinking) {
+    auto c = config("no_thinking");
+    c.sweeps = 1;
+    c.enable_thinking = false;
+    c.reasoning_effort = "";
+    c.max_tokens = 256;
+    auto server = std::make_shared<FakeJobServer>();
+    auto cl = client(server);
+    runBatchOptimization(c, cl, noSleep);
+    ASSERT_EQ(server->post_conditions.size(), 2u);
+    EXPECT_EQ(server->post_conditions[0],
+              (json{{"enable_thinking", false}, {"reasoning_effort", nullptr}, {"max_tokens", 256}}));
+
+    auto thinking = c;
+    thinking.enable_thinking = true;
+    thinking.reasoning_effort = "low";
+    EXPECT_THROW(runBatchOptimization(thinking, cl, noSleep), std::runtime_error);
+}
+
+TEST_F(BatchRunTest, RefusesToResumeWithChangedConditions) {
+    auto c = config("conditions_changed");
+    c.sweeps = 1;
+    auto server = std::make_shared<FakeJobServer>();
+    auto cl = client(server);
+    runBatchOptimization(c, cl, noSleep);
+
+    auto effort = c;
+    effort.reasoning_effort = "xhigh";
+    EXPECT_THROW(runBatchOptimization(effort, cl, noSleep), std::runtime_error);
+    auto tokens = c;
+    tokens.max_tokens = 4096;
+    EXPECT_THROW(runBatchOptimization(tokens, cl, noSleep), std::runtime_error);
+    EXPECT_EQ(server->posts, 2);  // sweep 0 と 1 だけ。条件を変えた周は投げていない
+}
+
+TEST_F(BatchRunTest, RefusesJobThatRanWithOtherConditions) {
+    auto c = config("conditions_mismatch");
+    auto server = std::make_shared<FakeJobServer>();
+    server->override_reasoning_effort = "xhigh";
+    auto cl = client(server);
+    EXPECT_THROW(runBatchOptimization(c, cl, noSleep), std::runtime_error);
+    EXPECT_FALSE(fs::exists(fs::path(c.run_dir) / "checkpoint.json"));
+}
+
+TEST(BatchOptimizerConfigTest, RequiresValidConditions) {
+    const fs::path path = fs::temp_directory_path() / "batch_optimizer_config_test.json";
+    json j = {{"server_url", "http://x"}, {"client_id", "t"}, {"enable_thinking", true},
+              {"reasoning_effort", "medium"}, {"max_tokens", 8192},
+              {"sweeps", 1}, {"initial_temperature", 0.1}, {"final_temperature", 0.01}, {"mutation_step_size", 0.05},
+              {"seed", 42}, {"population_csv", "p"}, {"questions_csv", "q"}, {"system_prompt_path", "s"},
+              {"user_prompt_path", "u"}, {"real_ratios_csv", "r"}, {"run_dir", "d"}};
+    auto load = [&](const json& body) {
+        std::ofstream(path) << body.dump();
+        return loadBatchOptimizerConfig(path.string());
+    };
+    const auto c = load(j);
+    EXPECT_EQ(c.reasoning_effort, "medium");
+    EXPECT_EQ(c.max_tokens, 8192);
+
+    for (const char* key : {"enable_thinking", "reasoning_effort", "max_tokens"}) {
+        json missing = j;
+        missing.erase(key);
+        EXPECT_ANY_THROW(load(missing)) << key;
+    }
+    json bad = j;
+    bad["reasoning_effort"] = "high";
+    EXPECT_THROW(load(bad), std::runtime_error);
+    bad = j;
+    bad["max_tokens"] = 0;
+    EXPECT_THROW(load(bad), std::runtime_error);
+
+    // 思考なしのときは reasoning_effort を書かない
+    json off = j;
+    off["enable_thinking"] = false;
+    EXPECT_THROW(load(off), std::runtime_error);
+    off.erase("reasoning_effort");
+    const auto c_off = load(off);
+    EXPECT_FALSE(c_off.enable_thinking);
+    EXPECT_EQ(c_off.reasoning_effort, "");
+    off["reasoning_effort"] = nullptr;
+    EXPECT_NO_THROW(load(off));
+    fs::remove(path);
 }
