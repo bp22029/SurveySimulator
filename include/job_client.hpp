@@ -66,6 +66,15 @@ struct JobStatus {
     std::vector<JobOutput> results; // done のとき
 };
 
+// GET /jobs?client_id=...&sweep=... で得られるジョブのメタデータ
+struct JobMeta {
+    int job_id = 0;
+    std::string status;
+    int attempts = 0;
+    std::optional<double> started_at;   // UNIX 時刻（秒）。まだ始まっていなければ空
+    std::optional<double> finished_at;
+};
+
 struct JobClientOptions {
     long post_timeout_sec = 300;   // 1周分の requests は数十 MB になる
     long get_timeout_sec = 600;    // done の結果は展開後に数百 MB になりうる
@@ -86,6 +95,9 @@ public:
 
     // (client_id, sweep) のジョブがあれば job_id を返す（クライアント再起動時の復旧用）
     std::optional<int> find(const std::string& client_id, int sweep);
+
+    // (client_id, sweep) のジョブのメタデータ（推論の開始・終了時刻など）
+    std::optional<JobMeta> findMeta(const std::string& client_id, int sweep);
 
     JobStatus get(int job_id);
 

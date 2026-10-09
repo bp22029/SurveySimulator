@@ -17,6 +17,7 @@ int main(int argc, char** argv) {
     }
     try {
         const BatchOptimizerConfig config = loadBatchOptimizerConfig(argv[1]);
+        std::cout << "job_server: " << config.server_url << " (from " << config.server_url_source << ")" << std::endl;
         JobClient client(config.server_url, std::make_shared<CurlTransport>());
         runBatchOptimization(config, client);
     } catch (const std::exception& e) {

@@ -53,3 +53,11 @@ r1・r5 の保存ファイルには推論条件が入っていないので、`co
 
 推論条件をジョブごとに受け取るようにした変更（2026-10-09）で、サーバーのコードが変わった。推論の呼び出し方は同じだが、
 新しい一式を送ったら上のコマンドで r1 と一致することを確かめてから本番に進む。
+
+## 2026-10-09：推論条件をジョブごとに指定する変更の後（`5b37582`）
+
+job_server を commit `5b37582` の一式に入れ替え（`git.dirty: false`、`scheduler`・`cache.num_gpu_blocks` 648 は 10/8 と同じ）、
+研究室PC から同じ20人を `--enable-thinking true --reasoning-effort medium --max-tokens 8192 --client-id verify2 --sweep 1` で流した（job 16）。
+
+- r1 と比べて 1,020件すべて一致（`identical: 1020  different: 0  different final answer: 0`）**合格**
+- 所要時間 724.0秒（36.2秒/人）。出力トークン：平均 763、p50 762、p99 1187、最大 1392。打ち切り 0件

@@ -10,6 +10,7 @@
 #include <stdexcept>
 #include "nlohmann/json.hpp"
 #include "batch_optimizer.hpp"
+#include "calibrate_temperature.hpp"
 #include "individual_response_manager.hpp"
 #include "job_client.hpp"
 #include "optimization_manager.hpp"
@@ -394,7 +395,11 @@ public:
             json list = json::array();
             for (const auto& job : jobs_) {
                 std::string query = "client_id=" + job.client_id + "&sweep=" + std::to_string(job.sweep);
-                if (url.substr(q + 6) == query) list.push_back({{"job_id", job.id}, {"status", job.status}});
+                // 推論時間は job_id ごとに 3600 秒 + id 秒とする
+                if (url.substr(q + 6) == query) {
+                    list.push_back({{"job_id", job.id}, {"status", job.status}, {"attempts", 1},
+                                    {"started_at", 1000.0}, {"finished_at", 1000.0 + 3600.0 + job.id}});
+                }
             }
             return {200, json{{"jobs", list}}.dump(), ""};
         }
@@ -423,6 +428,8 @@ public:
         }
         return {200, body.dump(), ""};
     }
+
+    size_t jobCount() const { return jobs_.size(); }
 
 private:
     struct Job {
@@ -708,7 +715,8 @@ TEST_F(BatchRunTest, RefusesJobThatRanWithOtherConditions) {
 
 TEST(BatchOptimizerConfigTest, RequiresValidConditions) {
     const fs::path path = fs::temp_directory_path() / "batch_optimizer_config_test.json";
-    json j = {{"server_url", "http://x"}, {"client_id", "t"}, {"enable_thinking", true},
+    setenv("JOB_SERVER_URL", "http://x", 1);
+    json j = {{"client_id", "t"}, {"enable_thinking", true},
               {"reasoning_effort", "medium"}, {"max_tokens", 8192},
               {"sweeps", 1}, {"initial_temperature", 0.1}, {"final_temperature", 0.01}, {"mutation_step_size", 0.05},
               {"seed", 42}, {"population_csv", "p"}, {"questions_csv", "q"}, {"system_prompt_path", "s"},
@@ -744,4 +752,161 @@ TEST(BatchOptimizerConfigTest, RequiresValidConditions) {
     off["reasoning_effort"] = nullptr;
     EXPECT_NO_THROW(load(off));
     fs::remove(path);
+}
+
+// ==========================================
+// CalibrateTemperature
+// ==========================================
+
+TEST(CalibrateTemperatureTest, MeanDeltaMethodReproducesLastYearsTemperatures) {
+    // 昨年度（Qwen3-14B）：悪化の平均 ΔĒ ≈ 0.01410 から 0.02034 / 0.002269
+    EXPECT_NEAR(temperatureFromMeanDelta(0.014100, 0.5), 0.02034, 1e-5);
+    EXPECT_NEAR(temperatureFromMeanDelta(0.014100, 0.002), 0.002269, 1e-6);
+}
+
+TEST(CalibrateTemperatureTest, DistributionMethodHitsTargetAcceptance) {
+    const std::vector<double> worse = {0.005, 0.005, 0.01, 0.015, 0.02, 0.04, 0.08};
+    for (double p : {0.5, 0.002}) {
+        const double t = temperatureForAcceptance(worse, p);
+        EXPECT_NEAR(expectedAcceptance(worse, t), p, 1e-9) << p;
+    }
+    // ΔE がすべて同じなら、2つの方法は一致する
+    const std::vector<double> same(10, 0.0141);
+    EXPECT_NEAR(temperatureForAcceptance(same, 0.5), temperatureFromMeanDelta(0.0141, 0.5), 1e-12);
+    EXPECT_THROW(temperatureForAcceptance({}, 0.5), std::invalid_argument);
+}
+
+TEST(CalibrateTemperatureTest, SummarizeTreatsRoundingNoiseAsZero) {
+    const DeltaStats s = summarizeDeltas({0.01, 0.03, -0.02, 0.0, 3.55e-15, -1e-14}, 2);
+    EXPECT_EQ(s.n_proposals, 6);
+    EXPECT_EQ(s.n_skipped, 2);
+    EXPECT_EQ(s.n_worse, 2);
+    EXPECT_EQ(s.n_better, 1);
+    EXPECT_EQ(s.n_zero, 3);
+    EXPECT_DOUBLE_EQ(s.mean_worse, 0.02);
+}
+
+TEST_F(BatchRunTest, CalibrationMeasuresEachProposalAgainstTheInitialState) {
+    auto c = config("calib_run");
+    auto server = std::make_shared<FakeJobServer>();
+    auto cl = client(server);
+    const std::string out = (dir / "calib").string();
+    const CalibrationResult result = runCalibration(c, 3, out, cl, noSleep);
+
+    ASSERT_EQ(result.rounds.size(), 3u);
+    EXPECT_EQ(result.rounds[0].client_id, "tester");        // 本番と共有
+    EXPECT_EQ(result.rounds[1].client_id, "tester-calib");
+    EXPECT_EQ(server->jobCount(), 4u);                       // 初期状態 + 3回
+
+    // ΔE は、初期状態からその人の回答だけを入れ替えて TAE を数え直した差と一致する
+    std::ifstream pop_in(fs::path(out) / "initial_population.csv");
+    ASSERT_TRUE(pop_in.good());
+    json summary = json::parse(std::ifstream(fs::path(out) / "calibration_summary.json"));
+    EXPECT_EQ(summary["rounds"].size(), 3u);
+    EXPECT_DOUBLE_EQ(summary["initial_tae"].get<double>(), result.initial_tae);
+    EXPECT_TRUE(fs::exists(fs::path(out) / "calibration_deltas.csv"));
+
+    int n_worse = 0;
+    for (const auto& r : result.rounds) {
+        ASSERT_EQ(r.person_ids.size(), 12u);
+        for (double d : r.deltas) n_worse += d > kDeltaTolerance;
+    }
+    EXPECT_EQ(summary["total"]["n_worse"].get<int>(), n_worse);
+    if (n_worse > 0) {
+        const auto& m = summary["temperatures"]["distribution_method"];
+        EXPECT_NEAR(m["expected_acceptance_at_initial"].get<double>(), 0.5, 1e-9);
+        EXPECT_NEAR(m["expected_acceptance_at_final"].get<double>(), 0.002, 1e-9);
+    }
+}
+
+TEST_F(BatchRunTest, CalibrationDeltasMatchRecountedTae) {
+    auto c = config("calib_recount");
+    auto server = std::make_shared<FakeJobServer>();
+    auto cl = client(server);
+    const CalibrationResult result = runCalibration(c, 1, (dir / "calib_recount_out").string(), cl, noSleep);
+
+    // 同じ初期状態と変更案を自分で作り直し、TAE を最初から数え直して比べる
+    const OptimizerInputs in = loadOptimizerInputs(c);
+    std::mt19937_64 rng(c.seed);
+    auto population = in.population;
+    assignInitialPersonality(population, rng);
+    auto initial_prompts = buildPrompts(population, in.questions, in.system_template, in.user_template);
+    auto initial = parseResults(cl.get(1).results, initial_prompts, in.questions).answers;
+    const SweepPlan plan = planSweep(population, c.mutation_step_size, rng);
+    auto prompts = buildPrompts(plan.proposals, in.questions, in.system_template, in.user_template);
+    auto proposed = parseResults(cl.get(2).results, prompts, in.questions).answers;
+
+    TaeTracker base;
+    base.setRealData(in.real_ratios);
+    base.initialize(initial, 12, questionIds(in.questions));
+    const auto& r = result.rounds[0];
+    for (size_t i = 0; i < r.person_ids.size(); ++i) {
+        auto answers = initial;
+        for (const auto& [qid, choice] : proposed[r.person_ids[i]]) answers[r.person_ids[i]][qid] = choice;
+        TaeTracker t;
+        t.setRealData(in.real_ratios);
+        t.initialize(answers, 12, questionIds(in.questions));
+        EXPECT_NEAR(r.deltas[i], t.total() - base.total(), 1e-12) << r.person_ids[i];
+    }
+}
+
+TEST_F(BatchRunTest, OptimizationReusesCalibrationJobsForSweeps0And1) {
+    auto c = config("calib_then_run");
+    auto server = std::make_shared<FakeJobServer>();
+    auto cl = client(server);
+    runCalibration(c, 2, (dir / "calib_shared").string(), cl, noSleep);
+    ASSERT_EQ(server->jobCount(), 3u); // tester#0, tester#1, tester-calib#2
+
+    // 本番は sweep 0 と 1 で同じ内容を投げる。違えばサーバーは 409 を返し、ここで例外になる
+    runBatchOptimization(c, cl, noSleep);
+    EXPECT_EQ(server->jobCount(), 3u + (c.sweeps - 1)); // sweep 2〜4 だけが新しいジョブ
+    EXPECT_EQ(checkpoint(c)["job_ids"]["0"], 1);
+    EXPECT_EQ(checkpoint(c)["job_ids"]["1"], 2);
+}
+
+TEST_F(BatchRunTest, CalibrationRefusesToWriteIntoTheRunDir) {
+    auto c = config("calib_same_dir");
+    auto server = std::make_shared<FakeJobServer>();
+    auto cl = client(server);
+    EXPECT_THROW(runCalibration(c, 1, c.run_dir, cl, noSleep), std::invalid_argument);
+    EXPECT_THROW(runCalibration(c, 0, (dir / "x").string(), cl, noSleep), std::invalid_argument);
+    EXPECT_EQ(server->posts, 0);
+}
+
+TEST_F(BatchRunTest, CalibrationReportsInferenceTimeAndEstimates) {
+    auto c = config("calib_timing");
+    c.sweeps = 100;
+    auto server = std::make_shared<FakeJobServer>();
+    auto cl = client(server);
+    const std::string out = (dir / "calib_timing_out").string();
+    const CalibrationResult result = runCalibration(c, 2, out, cl, noSleep);
+
+    EXPECT_DOUBLE_EQ(result.initial_elapsed_sec, 3601.0);  // job 1
+    EXPECT_DOUBLE_EQ(result.rounds[0].elapsed_sec, 3602.0);
+    EXPECT_DOUBLE_EQ(result.rounds[1].elapsed_sec, 3603.0);
+
+    json timing = json::parse(std::ifstream(fs::path(out) / "calibration_summary.json"))["timing"];
+    EXPECT_DOUBLE_EQ(timing["mean_sec_per_sweep"].get<double>(), 3602.0);
+    EXPECT_NEAR(timing["estimated_total_for_sweeps"]["100"]["hours"].get<double>(), 100.0 * 3602.0 / 3600.0, 1e-9);
+    EXPECT_NEAR(timing["estimated_total_for_sweeps"]["50"]["days"].get<double>(), 50.0 * 3602.0 / 86400.0, 1e-9);
+}
+
+TEST(ServerUrlTest, EnvironmentVariableThenEnvFileThenConfig) {
+    const fs::path env_file = fs::temp_directory_path() / "server_url_test.env";
+    std::ofstream(env_file) << "# comment\nOTHER=1\nexport JOB_SERVER_URL = \"http://from-file:8000\"\r\n";
+
+    setenv("JOB_SERVER_URL", "http://from-env:8000", 1);
+    EXPECT_EQ(resolveServerUrl("http://from-config", env_file.string()).first, "http://from-env:8000");
+
+    unsetenv("JOB_SERVER_URL");
+    auto [url, source] = resolveServerUrl("http://from-config", env_file.string());
+    EXPECT_EQ(url, "http://from-file:8000");
+    EXPECT_EQ(source, env_file.string());
+
+    EXPECT_EQ(resolveServerUrl("http://from-config", "/nonexistent/.env").first, "http://from-config");
+    EXPECT_THROW(resolveServerUrl("", "/nonexistent/.env"), std::runtime_error);
+
+    std::ofstream(env_file) << "JOB_SERVER_URL=\n";  // 空なら使わない
+    EXPECT_THROW(resolveServerUrl("", env_file.string()), std::runtime_error);
+    fs::remove(env_file);
 }

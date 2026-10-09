@@ -12,6 +12,8 @@
   # 保存した結果の出力トークン数の分布
   python verify.py stats r1.json
 
+--server を省略すると、環境変数 JOB_SERVER_URL、なければカレントディレクトリの .env の JOB_SERVER_URL を使う。
+
 client_id と sweep の組はジョブごとに一意なので、同じ入力を何度も推論するときは sweep を変える。
 enable_thinking・reasoning_effort・max_tokens はジョブの推論条件で、比べる2つの結果では揃えること（compare が表示する）。
 思考なし（--enable-thinking false）のときは --reasoning-effort を付けない。
@@ -19,11 +21,37 @@ enable_thinking・reasoning_effort・max_tokens はジョブの推論条件で�
 import argparse
 import gzip
 import json
+import os
 import re
 import sys
 import time
 import urllib.error
 import urllib.request
+
+
+def default_server(env_file=".env"):
+    """C++ の resolveServerUrl と同じ順番：環境変数 JOB_SERVER_URL → .env の JOB_SERVER_URL。"""
+    if os.environ.get("JOB_SERVER_URL"):
+        return os.environ["JOB_SERVER_URL"]
+    try:
+        with open(env_file, encoding="utf-8") as f:
+            lines = f.read().splitlines()
+    except OSError:
+        return None
+    value = None
+    for line in lines:
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line.startswith("export "):
+            line = line[len("export "):].strip()
+        key, sep, val = line.partition("=")
+        if sep and key.strip() == "JOB_SERVER_URL":
+            val = val.strip()
+            if len(val) >= 2 and val[0] == val[-1] and val[0] in "'\"":
+                val = val[1:-1]
+            value = val or None
+    return value
 
 
 def http(method, url, body=None, timeout=600):
@@ -180,7 +208,7 @@ def main():
     sub = p.add_subparsers(dest="command", required=True)
 
     s = sub.add_parser("submit")
-    s.add_argument("--server", required=True)
+    s.add_argument("--server", help="省略時は JOB_SERVER_URL（環境変数、なければ .env）")
     s.add_argument("--requests", required=True, help="DumpPrompts の出力")
     s.add_argument("--client-id", required=True)
     s.add_argument("--sweep", type=int, required=True)
@@ -207,6 +235,9 @@ def main():
 
     args = p.parse_args()
     if args.command == "submit":
+        args.server = args.server or default_server()
+        if not args.server:
+            p.error("--server is required unless JOB_SERVER_URL is set (environment or .env)")
         if not args.no_wait and not args.out:
             p.error("--out is required unless --no-wait")
         args.enable_thinking = args.enable_thinking == "true"

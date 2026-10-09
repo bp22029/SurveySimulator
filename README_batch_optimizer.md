@@ -19,12 +19,17 @@
 ## 使い方
 
 ```bash
+cp .env.example .env                                    # 初回だけ。JOB_SERVER_URL を Blackwell の URL にする
 cp config/batch_optimizer.example.json my_config.json   # 編集する
 ./build/src/BatchOptimizer my_config.json
 ```
 
+- サーバーの URL は設定ファイルには書かない。環境変数 `JOB_SERVER_URL`、なければリポジトリのルートの `.env`
+  （`JOB_SERVER_URL=http://192.168.130.XXX:8000`）から読む。`.env` は commit しない（`.gitignore` 済み）。
+  起動時に、どこから読んだ URL かを表示する。URL は再現性の照合に使わない（サーバーの同一性は `/info` で照合する）
 - 相対パスは、実行したときのカレントディレクトリ（リポジトリのルートを想定）から解決される
-- `client_id` は人ごとに変える（例：`bp22029`、後輩は自分のアカウント名）
+- `client_id` は人ごとに変える。`(client_id, sweep)` はサーバーに残り続けるので、条件を変えて最初からやり直すときは
+  別の名前にする（例：`bp22029-q38-medium-r1`。後輩は自分のアカウント名で始める）
 - `enable_thinking`・`reasoning_effort`（`xhigh`・`medium`・`low`）・`max_tokens` は推論条件で、各自の研究で決めて書く。
   思考なし（`"enable_thinking": false`）のときは `reasoning_effort` を書かない。サーバーはジョブごとにこの条件で推論するので、
   2人が別の値を使ってもよい。最適化した個性はその条件でのものなので、個性を使う実験でも思考の有無と effort はできるだけ揃える
@@ -33,6 +38,44 @@ cp config/batch_optimizer.example.json my_config.json   # 編集する
   サーバーに同じ周のジョブが残っていれば、投げ直さずにその結果を使う
 - 途中で設定（推論条件、温度、周回数、seed、プロンプトなど）を変えて再開しようとすると止まる。
   サーバーのモデル・revision・vLLM などのバージョンが変わっていた場合も止まる
+
+## 温度を決める：CalibrateTemperature
+
+SA の初期温度・終了温度は、昨年度と同じく山田らの方法（悪化した変更案を受け入れる割合 μAG比 が
+50％ になる温度を初期温度、0.2％ になる温度を終了温度）で決める。ΔE の大きさはモデルや推論条件で
+変わるので、本番と同じ設定ファイルで測ってから決める。
+
+```bash
+./build/src/CalibrateTemperature my_config.json 3 runs/bp22029_calibration
+```
+
+- 初期状態（本番の sweep 0 と同じ個性）を推論し、全員に変更案を1つずつ作って推論し直し、
+  「その人の回答だけを入れ替えたときの ΔTAE」を1人ずつ求める。これを指定した回数（例：3回）繰り返す。
+  採否は判定しないので、途中の温度に左右されない「出発点での ΔE の分布」になる
+- 1回 ＝ 全員分の推論1ジョブ。初期状態と合わせて (回数＋1) ジョブを投げる
+- 初期状態と1回目は、本番の sweep 0・sweep 1 とまったく同じ入力なので、本番と同じ `client_id` で投げる。
+  あとで同じ設定ファイルで `BatchOptimizer` を始めると、サーバーはその結果を返し、推論し直さない。
+  2回目以降は `<client_id>-calib` で投げる
+- 測ったあとで推論条件・seed・プロンプト・変異の幅を変えると、本番の sweep 0 が合わなくなる（HTTP 409）。
+  その場合は本番の `client_id` を変える
+- 途中で止まっても、同じ引数で起動し直せば、終わったジョブはサーバーの結果を使う
+
+出力（`out_dir`。本番の `run_dir` とは別にする）：
+
+| ファイル | 内容 |
+|---|---|
+| `calibration_deltas.csv` | 1人ずつの ΔTAE（round, client_id, sweep, job_id, person_id, delta, skipped） |
+| `calibration_summary.json` | 初期 TAE、回ごとと全体の件数（悪化・改善・変化なし）、悪化の平均 ΔĒ、2つの方法による温度 |
+| `initial_population.csv` | 初期状態の個性と回答（sweep 0 の population と同じ） |
+
+温度は2つの方法で出す（終了時に表示され、`calibration_summary.json` の `temperatures` に入る）：
+
+- `mean_delta_method`（昨年度と同じ）：T₀ = ΔĒ / ln 2、T_f = ΔĒ / ln 500。昨年度は Qwen3-14B で ΔĒ ≈ 0.0141 → 0.02034 / 0.002269
+- `distribution_method`：測った ΔE の分布について、受け入れる割合の期待値（ΔE ごとの exp(−ΔE/T) の平均）が
+  ちょうど 50％・0.2％ になる温度。ΔE のばらつきが大きいと、平均だけで決めた温度では終了時の割合が 0.2％ より高くなる
+  （昨年度の本番では最後の周で 2〜4％ だった）
+
+どちらの方法でも、設定ファイルの周回数で冷却率 α = (T_f/T₀)^(1/(周回数×人数)) を表示する。
 
 ## 出力（`run_dir`）
 

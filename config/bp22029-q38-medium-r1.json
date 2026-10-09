@@ -1,19 +1,19 @@
 {
-  "client_id": "bp22029",
+  "client_id": "bp22029-q38-medium-r1",
   "enable_thinking": true,
   "reasoning_effort": "medium",
   "max_tokens": 8192,
-  "sweeps": 50,
+  "sweeps": 100,
   "initial_temperature": 0.02034,
   "final_temperature": 0.002269,
   "mutation_step_size": 0.05,
   "seed": 42,
   "population_csv": "data/2015_001_8+_47356.csv",
   "questions_csv": "data/ssm2015.csv",
-  "system_prompt_path": "data/prompt_templates/forQwen/qwen_bfi2.txt",
+  "system_prompt_path": "data/prompt_templates/forQwen38/qwen38_bfi2.txt",
   "user_prompt_path": "data/prompt_templates/user_prompt_template.txt",
   "real_ratios_csv": "data/real_ratios.csv",
-  "run_dir": "runs/bp22029",
+  "run_dir": "runs/bp22029-q38-medium-r1",
   "poll_interval_sec": 30,
   "max_job_attempts": 3
 }

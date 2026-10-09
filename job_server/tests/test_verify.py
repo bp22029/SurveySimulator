@@ -67,3 +67,13 @@ def test_submit_requires_effort_only_with_thinking(tmp_path):
                               capture_output=True, text=True, encoding="utf-8")
     assert "required with --enable-thinking true" in submit("--enable-thinking", "true").stderr
     assert "not allowed with false" in submit("--enable-thinking", "false", "--reasoning-effort", "low").stderr
+
+
+def test_default_server_reads_environment_then_env_file(tmp_path, monkeypatch):
+    env = tmp_path / ".env"
+    env.write_text('# c\nexport JOB_SERVER_URL = "http://from-file:8000"\n', encoding="utf-8")
+    monkeypatch.setenv("JOB_SERVER_URL", "http://from-env:8000")
+    assert verify.default_server(str(env)) == "http://from-env:8000"
+    monkeypatch.delenv("JOB_SERVER_URL")
+    assert verify.default_server(str(env)) == "http://from-file:8000"
+    assert verify.default_server(str(tmp_path / "missing")) is None

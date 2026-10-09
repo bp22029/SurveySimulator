@@ -125,6 +125,12 @@ int JobClient::submit(const std::string& client_id, int sweep, const JobConditio
 }
 
 std::optional<int> JobClient::find(const std::string& client_id, int sweep) {
+    auto meta = findMeta(client_id, sweep);
+    if (!meta) return std::nullopt;
+    return meta->job_id;
+}
+
+std::optional<JobMeta> JobClient::findMeta(const std::string& client_id, int sweep) {
     // client_id は英数字と記号を想定し、URL エンコードはしない
     const std::string url = base_url_ + "/jobs?client_id=" + client_id + "&sweep=" + std::to_string(sweep);
     HttpResponse res = withRetry("GET /jobs", [&] { return transport_->get(url, options_.get_timeout_sec); });
@@ -133,7 +139,14 @@ std::optional<int> JobClient::find(const std::string& client_id, int sweep) {
     }
     const auto jobs = json::parse(res.body).at("jobs");
     if (jobs.empty()) return std::nullopt;
-    return jobs.at(0).at("job_id").get<int>();
+    const auto& j = jobs.at(0);
+    JobMeta meta;
+    meta.job_id = j.at("job_id").get<int>();
+    meta.status = j.value("status", "");
+    meta.attempts = j.value("attempts", 0);
+    if (j.contains("started_at") && j["started_at"].is_number()) meta.started_at = j["started_at"].get<double>();
+    if (j.contains("finished_at") && j["finished_at"].is_number()) meta.finished_at = j["finished_at"].get<double>();
+    return meta;
 }
 
 JobStatus JobClient::get(int job_id) {

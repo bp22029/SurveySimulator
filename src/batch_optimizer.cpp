@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <cstdlib>
 #include <ctime>
 #include <filesystem>
 #include <fstream>
@@ -13,6 +14,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <thread>
+#include <tuple>
 #include "nlohmann/json.hpp"
 #include "../include/data_loader.hpp"
 #include "../include/portable_random.hpp"
@@ -46,6 +48,8 @@ std::string sweepTag(int sweep) {
     return os.str();
 }
 
+} // namespace
+
 void writeFileAtomic(const fs::path& path, const std::string& content) {
     fs::create_directories(path.parent_path());
     fs::path tmp = path;
@@ -59,6 +63,8 @@ void writeFileAtomic(const fs::path& path, const std::string& content) {
     fs::rename(tmp, path);
 }
 
+namespace {
+
 std::string readFile(const std::string& path) {
     std::ifstream in(path, std::ios::binary);
     if (!in) throw std::runtime_error("cannot open " + path);
@@ -67,13 +73,13 @@ std::string readFile(const std::string& path) {
     return os.str();
 }
 
+} // namespace
+
 std::vector<std::string> questionIds(const std::vector<Question>& questions) {
     std::vector<std::string> ids;
     for (const auto& q : questions) ids.push_back(q.id);
     return ids;
 }
-
-} // namespace
 
 // ==========================================
 // 設定
@@ -82,7 +88,7 @@ std::vector<std::string> questionIds(const std::vector<Question>& questions) {
 BatchOptimizerConfig loadBatchOptimizerConfig(const std::string& path) {
     const json j = json::parse(readFile(path));
     BatchOptimizerConfig c;
-    c.server_url = j.at("server_url").get<std::string>();
+    std::tie(c.server_url, c.server_url_source) = resolveServerUrl(j.value("server_url", std::string()));
     c.client_id = j.at("client_id").get<std::string>();
     c.enable_thinking = j.at("enable_thinking").get<bool>();
     // 思考なしのとき、テンプレートは reasoning_effort を使わない。意味のない値を記録しないよう、書かせない
@@ -114,6 +120,42 @@ BatchOptimizerConfig loadBatchOptimizerConfig(const std::string& path) {
     return c;
 }
 
+std::string readEnvFileValue(const std::string& path, const std::string& key) {
+    std::ifstream in(path);
+    if (!in) return "";
+    auto trim = [](std::string s) {
+        const char* ws = " \t\r";
+        s.erase(0, s.find_first_not_of(ws));
+        s.erase(s.find_last_not_of(ws) + 1);
+        return s;
+    };
+    std::string line, value;
+    while (std::getline(in, line)) {
+        line = trim(line);
+        if (line.empty() || line[0] == '#') continue;
+        if (line.rfind("export ", 0) == 0) line = trim(line.substr(7));
+        const size_t eq = line.find('=');
+        if (eq == std::string::npos || trim(line.substr(0, eq)) != key) continue;
+        value = trim(line.substr(eq + 1));
+        if (value.size() >= 2 && (value.front() == '"' || value.front() == '\'') && value.back() == value.front()) {
+            value = value.substr(1, value.size() - 2);
+        }
+    }
+    return value; // 同じキーが複数あれば最後のもの
+}
+
+std::pair<std::string, std::string> resolveServerUrl(const std::string& config_value, const std::string& env_file) {
+    if (const char* env = std::getenv("JOB_SERVER_URL"); env != nullptr && *env != '\0') {
+        return {env, "environment variable JOB_SERVER_URL"};
+    }
+    if (std::string v = readEnvFileValue(env_file, "JOB_SERVER_URL"); !v.empty()) {
+        return {v, env_file};
+    }
+    if (!config_value.empty()) return {config_value, "server_url in the config file"};
+    throw std::runtime_error("job_server URL is not set. Set JOB_SERVER_URL in the environment or in " + env_file +
+                             " (e.g. JOB_SERVER_URL=http://192.168.130.XXX:8000; see .env.example)");
+}
+
 void requireLfInputFiles(const BatchOptimizerConfig& c) {
     for (const auto& path : {c.population_csv, c.questions_csv, c.system_prompt_path, c.user_prompt_path,
                              c.real_ratios_csv}) {
@@ -123,6 +165,22 @@ void requireLfInputFiles(const BatchOptimizerConfig& c) {
                 "`); CR characters would end up in the prompts and change the model outputs.");
         }
     }
+}
+
+OptimizerInputs loadOptimizerInputs(const BatchOptimizerConfig& c) {
+    requireLfInputFiles(c);
+    OptimizerInputs in;
+    in.population = readSyntheticPopulation(c.population_csv);
+    in.questions = readQuestions(c.questions_csv);
+    in.system_template = readPromptTemplate(c.system_prompt_path);
+    in.user_template = readPromptTemplate(c.user_prompt_path);
+    if (in.population.empty() || in.questions.empty() || in.system_template.empty() || in.user_template.empty()) {
+        throw std::runtime_error("failed to load population, questions or prompt templates");
+    }
+    TaeTracker tracker;
+    if (!tracker.loadRealData(c.real_ratios_csv)) throw std::runtime_error("failed to load " + c.real_ratios_csv);
+    in.real_ratios = tracker.realData();
+    return in;
 }
 
 // 最適化の途中で変えてはいけない設定（設計書 §6）
@@ -477,21 +535,23 @@ json reproducibleServerSettings(const json& info) {
     return out;
 }
 
-JobStatus runJob(const BatchOptimizerConfig& c, JobClient& client, int sweep, const std::vector<JobPrompt>& prompts,
-                 const std::function<void(int)>& sleep_sec) {
-    if (auto existing = client.find(c.client_id, sweep)) {
+} // namespace
+
+JobStatus runJob(const BatchOptimizerConfig& c, JobClient& client, const std::string& client_id, int sweep,
+                 const std::vector<JobPrompt>& prompts, const std::function<void(int)>& sleep_sec) {
+    if (auto existing = client.find(client_id, sweep)) {
         std::cout << "[sweep " << sweep << "] found existing job " << *existing << " on the server" << std::endl;
     }
     // 既存のジョブがあっても投げる。サーバーは同じ内容なら既存の job_id を返し、違えば 409 になるので、
     // 再開時に変更案が前回と同じであることの確認にもなる
     const JobConditions conditions{c.enable_thinking, c.reasoning_effort, c.max_tokens};
-    int job_id = client.submit(c.client_id, sweep, conditions, prompts);
+    int job_id = client.submit(client_id, sweep, conditions, prompts);
     std::cout << "[sweep " << sweep << "] job " << job_id << " (" << prompts.size() << " prompts)" << std::endl;
 
     int failures = 0;
     while (true) {
         JobStatus st = client.get(job_id);
-        if (st.client_id != c.client_id || st.sweep != sweep) {
+        if (st.client_id != client_id || st.sweep != sweep) {
             throw std::runtime_error("job " + std::to_string(job_id) + " belongs to client_id=" + st.client_id +
                                      " sweep=" + std::to_string(st.sweep));
         }
@@ -510,14 +570,12 @@ JobStatus runJob(const BatchOptimizerConfig& c, JobClient& client, int sweep, co
             std::cerr << "[sweep " << sweep << "] job " << job_id << " failed (" << failures << "/"
                       << c.max_job_attempts << "):\n" << st.error << std::endl;
             if (failures >= c.max_job_attempts) throw std::runtime_error("job failed too many times");
-            client.submit(c.client_id, sweep, conditions, prompts); // failed のジョブは同じ job_id で再実行される
+            client.submit(client_id, sweep, conditions, prompts); // failed のジョブは同じ job_id で再実行される
             continue;
         }
         sleep_sec(c.poll_interval_sec);
     }
 }
-
-} // namespace
 
 // ==========================================
 // 全体
@@ -528,16 +586,13 @@ void runBatchOptimization(const BatchOptimizerConfig& c, JobClient& client,
     const std::function<void(int)> sleep_sec =
         sleep_arg ? sleep_arg : [](int s) { std::this_thread::sleep_for(std::chrono::seconds(s)); };
 
-    requireLfInputFiles(c);
-    const std::vector<Person> base_population = readSyntheticPopulation(c.population_csv);
-    const std::vector<Question> questions = readQuestions(c.questions_csv);
-    const std::string system_template = readPromptTemplate(c.system_prompt_path);
-    const std::string user_template = readPromptTemplate(c.user_prompt_path);
-    if (base_population.empty() || questions.empty() || system_template.empty() || user_template.empty()) {
-        throw std::runtime_error("failed to load population, questions or prompt templates");
-    }
+    const OptimizerInputs in = loadOptimizerInputs(c);
+    const std::vector<Person>& base_population = in.population;
+    const std::vector<Question>& questions = in.questions;
+    const std::string& system_template = in.system_template;
+    const std::string& user_template = in.user_template;
     TaeTracker tracker;
-    if (!tracker.loadRealData(c.real_ratios_csv)) throw std::runtime_error("failed to load " + c.real_ratios_csv);
+    tracker.setRealData(in.real_ratios);
     const int n = static_cast<int>(base_population.size());
     fs::create_directories(c.run_dir);
 
@@ -564,7 +619,7 @@ void runBatchOptimization(const BatchOptimizerConfig& c, JobClient& client,
         s.temperature = c.initial_temperature;
 
         const auto prompts = buildPrompts(s.population, questions, system_template, user_template);
-        const JobStatus st = runJob(c, client, 0, prompts, sleep_sec);
+        const JobStatus st = runJob(c, client, c.client_id, 0, prompts, sleep_sec);
         const ParsedResults parsed = parseResults(st.results, prompts, questions);
         s.answers = parsed.answers;
         tracker.initialize(s.answers, n, questionIds(questions));
@@ -583,7 +638,7 @@ void runBatchOptimization(const BatchOptimizerConfig& c, JobClient& client,
     for (int sweep = s.completed_sweep + 1; sweep <= c.sweeps; ++sweep) {
         const SweepPlan plan = planSweep(s.population, c.mutation_step_size, s.rng);
         const auto prompts = buildPrompts(plan.proposals, questions, system_template, user_template);
-        const JobStatus st = runJob(c, client, sweep, prompts, sleep_sec);
+        const JobStatus st = runJob(c, client, c.client_id, sweep, prompts, sleep_sec);
         const ParsedResults parsed = parseResults(st.results, prompts, questions);
 
         const auto decisions = applySweep(plan, parsed, s.population, s.answers, tracker, s.temperature, s.alpha, s.rng);

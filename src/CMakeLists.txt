@@ -19,6 +19,7 @@ add_library(SurveySimulatorLib STATIC
         tae_tracker.cpp
         job_client.cpp
         batch_optimizer.cpp
+        calibrate_temperature.cpp
 
         # ヘッダファイル
         ../include/data_loader.hpp
@@ -44,6 +45,7 @@ add_library(SurveySimulatorLib STATIC
         ../include/tae_tracker.hpp
         ../include/job_client.hpp
         ../include/batch_optimizer.hpp
+        ../include/calibrate_temperature.hpp
 )
 
 # (2) メインの実行ファイル "SurveySimulator" を定義
@@ -85,5 +87,13 @@ add_executable(DumpPrompts
         dump_prompts_main.cpp
 )
 target_link_libraries(DumpPrompts PRIVATE
+        SurveySimulatorLib
+)
+
+# (9) SA の温度を決めるための ΔE の測定 "CalibrateTemperature"（job_server を使う）
+add_executable(CalibrateTemperature
+        calibrate_main.cpp
+)
+target_link_libraries(CalibrateTemperature PRIVATE
         SurveySimulatorLib
 )

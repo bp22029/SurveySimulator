@@ -19,3 +19,8 @@ data/merged_population_responses.csv
 docs/
 # job_server/tools/package.py の出力（commit から作り直せる）
 /job_server_*.tar.gz
+data/real_ratios.csv
+# 環境ごとの設定（job_server の URL など）。.env.example をコピーして作る
+.env
+# BatchOptimizer・CalibrateTemperature の出力
+/runs/

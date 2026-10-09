@@ -19,6 +19,7 @@ public:
     // real_ratios.csv（question_id, ビンごとの比率...）を読み込む
     bool loadRealData(const std::string& filename);
     void setRealData(const std::map<std::string, std::vector<double>>& real_ratios);
+    const std::map<std::string, std::vector<double>>& realData() const { return real_ratios_; }
 
     // 全員の回答から件数を数え直す。question_ids の順番が足し上げの順番になる
     void initialize(const std::map<int, Answers>& all_answers, int population_size,

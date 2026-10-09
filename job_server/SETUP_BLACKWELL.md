@@ -392,7 +392,9 @@ docker compose run --rm simulator ./build/src/DumpPrompts config/batch_optimizer
 - 合成人口の CSV（`data/2015_001_8+_47356.csv`、git 管理外）が実験用PC にあること
 - `requests.json`（約42MB）は初期個性（seed 42）での全員分のプロンプト。commit しない
 
-以降の `verify.py` は Python 3 があればどこでも動く（追加のパッケージ不要）。`SERVER` はサーバーの URL：
+以降の `verify.py` は Python 3 があればどこでも動く（追加のパッケージ不要）。サーバーの URL は `--server` で渡すか、
+リポジトリのルートの `.env`（`cp .env.example .env` で作り、`JOB_SERVER_URL` を書き換える）か環境変数 `JOB_SERVER_URL` に
+書いておく（`--server` を省略するとそこから読む。BatchOptimizer・CalibrateTemperature も同じ）。下の例は `$SERVER` を使う：
 
 ```bash
 SERVER=http://<BlackwellのIP>:8000
