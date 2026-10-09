@@ -38,10 +38,10 @@ int main() {
     }
 
     // テスト用人口データの読み込み
-    std::vector<Person> test_population = readPopulationForTest("../../data/verification_population.csv");
-    if (test_population.empty()) {
-        return 1;
-    }
+    // std::vector<Person> test_population = readPopulationForTest("../../data/verification_population.csv");
+    // if (test_population.empty()) {
+    //     return 1;
+    // }
 
     // 質問データの読み込み
     std::vector<Question> questions = readQuestions("../../data/ssm2015.csv");
@@ -155,11 +155,11 @@ int main() {
 
 
     //統合したcsvから人口データを読み込む
-     std::string merged_filename = "../../data/parallel_merged_20260117_014011.csv";
-     std::vector<Person> merged_population = readPopulationFromMergedCSV(merged_filename);
-     if (merged_population.empty()) {
-         return 1;
-     }
+    //  std::string merged_filename = "../../data/parallel_merged_20260117_014011.csv";
+    //  std::vector<Person> merged_population = readPopulationFromMergedCSV(merged_filename);
+    //  if (merged_population.empty()) {
+    //      return 1;
+    //  }
 
     //verificationReproducibility(test_population,questions,system_prompt_templates_forQwen,user_prompt_template);
 
