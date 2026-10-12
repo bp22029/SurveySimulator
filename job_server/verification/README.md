@@ -61,3 +61,13 @@ job_server を commit `5b37582` の一式に入れ替え（`git.dirty: false`、
 
 - r1 と比べて 1,020件すべて一致（`identical: 1020  different: 0  different final answer: 0`）**合格**
 - 所要時間 724.0秒（36.2秒/人）。出力トークン：平均 763、p50 762、p99 1187、最大 1392。打ち切り 0件
+
+## 2026-10-12：qwen38 プロンプト（`forQwen38/qwen38_bfi2.txt`）
+
+`config/bp22029-q38-medium-r1.json` から `DumpPrompts` で作った入力の先頭20人（1,020件）を、
+`--enable-thinking true --reasoning-effort medium --max-tokens 8192 --client-id verify-q38` で2回流した（sweep 1・2、job 21・22）。
+サーバーは commit `5b37582` の一式のまま。
+
+- 1回目と2回目で 1,020件すべて一致（`identical: 1020  different: 0  different final answer: 0`）**合格**
+- 推論時間 770.5秒・774.5秒（約38秒/人）。出力トークン：平均 829、p50 828、p99 1,287、最大 1,968。打ち切り 0件
+- 旧プロンプト（平均 763 トークン）より出力が少し長い
