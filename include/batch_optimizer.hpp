@@ -141,6 +141,16 @@ std::vector<Decision> applySweep(const SweepPlan& plan, const ParsedResults& par
 void writePopulationCsv(const std::string& path, const std::vector<Person>& population,
                         const std::map<int, Answers>& answers, const std::vector<std::string>& question_ids);
 
+// 今後の実験に使う形の CSV：合成人口の CSV（population_csv）の各行の元の列をそのまま、同じ並びで書き、
+// その後ろに最適化した個性（E・A・C・N・O の順に、ドメイン得点と下位特性3つ）を付ける。引用符は付けない。
+// 個性の値は float を正確に復元できる9桁で書く（プロンプトには小数2桁で埋め込まれるため、丸めて書くと境目で値が変わりうる）
+void writeSyntheticPopulationWithBfi2(const std::string& population_csv, const std::vector<Person>& population,
+                                      const std::string& out_path);
+
+// 上の CSV のファイル名：synthetic_population_with_bfi2_<モデル名>_<client_id>_sweepNNN.csv
+// モデル名は "Qwen/Qwen3.8-27B" のような Hugging Face の名前の最後の部分（Qwen3.8-27B）
+std::string personalityCsvName(const std::string& model, const std::string& client_id, int sweep);
+
 // --- 全体 ---------------------------------------------------------------
 
 // ジョブを投げて done になるまで待つ。failed なら max_job_attempts 回まで投げ直す。
@@ -149,7 +159,12 @@ JobStatus runJob(const BatchOptimizerConfig& config, JobClient& client, const st
                  const std::vector<JobPrompt>& prompts, const std::function<void(int)>& sleep_sec);
 
 // チェックポイントがあれば続きから、なければ初期化（sweep 0 = 初期個性での推論）から始める
+// 最後の周まで終わると、run_dir に personalityCsvName の CSV も書く
 void runBatchOptimization(const BatchOptimizerConfig& config, JobClient& client,
                           const std::function<void(int)>& sleep_sec = nullptr);
+
+// チェックポイント（その時点で完了している最後の周）の個性で writeSyntheticPopulationWithBfi2 を書く。
+// out_path が空なら run_dir に personalityCsvName の名前で書く。書いたパスを返す。最適化の途中でも使える
+std::string exportPersonalityFromCheckpoint(const BatchOptimizerConfig& config, const std::string& out_path = "");
 
 #endif // BATCH_OPTIMIZER_HPP

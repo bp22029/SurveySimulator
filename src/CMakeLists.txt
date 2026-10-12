@@ -97,3 +97,11 @@ add_executable(CalibrateTemperature
 target_link_libraries(CalibrateTemperature PRIVATE
         SurveySimulatorLib
 )
+
+# (10) チェックポイントから、合成人口の元の列 ＋ 最適化した個性の CSV を書き出す "ExportPersonality"
+add_executable(ExportPersonality
+        export_personality_main.cpp
+)
+target_link_libraries(ExportPersonality PRIVATE
+        SurveySimulatorLib
+)

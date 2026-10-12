@@ -7,6 +7,7 @@
 #include <map>
 #include <memory>
 #include <set>
+#include <sstream>
 #include <stdexcept>
 #include "nlohmann/json.hpp"
 #include "batch_optimizer.hpp"
@@ -909,4 +910,84 @@ TEST(ServerUrlTest, EnvironmentVariableThenEnvFileThenConfig) {
     std::ofstream(env_file) << "JOB_SERVER_URL=\n";  // 空なら使わない
     EXPECT_THROW(resolveServerUrl("", env_file.string()), std::runtime_error);
     fs::remove(env_file);
+}
+
+// ==========================================
+// 今後の実験に使う形の CSV（合成人口の元の列 ＋ 最適化した個性）
+// ==========================================
+
+TEST(PersonalityCsvTest, NameContainsModelRunAndSweep) {
+    EXPECT_EQ(personalityCsvName("Qwen/Qwen3.8-27B", "bp22029-q38-medium-r1", 50),
+              "synthetic_population_with_bfi2_Qwen3.8-27B_bp22029-q38-medium-r1_sweep050.csv");
+    EXPECT_EQ(personalityCsvName("fake-model", "tester", 4), "synthetic_population_with_bfi2_fake-model_tester_sweep004.csv");
+}
+
+TEST_F(BatchRunTest, FinalPersonalityCsvKeepsPopulationColumnsAndAddsBfi2) {
+    auto server = std::make_shared<FakeJobServer>();
+    auto c = config("personality_csv");
+    auto cl = client(server);
+    runBatchOptimization(c, cl, noSleep);
+
+    const fs::path out = fs::path(c.run_dir) / "synthetic_population_with_bfi2_fake-model_tester_sweep004.csv";
+    ASSERT_TRUE(fs::exists(out));
+    std::ifstream f(out);
+    std::string header;
+    std::getline(f, header);
+    // 昨年の synthetic_population_with_bfi2.csv（Qwen3-14B）と同じヘッダー
+    EXPECT_EQ(header,
+              "prefecture_code,prefecture_name,city_code,city_name,town_code,town_name,latitude,longitude,household_id,"
+              "family_type_id,family_type,num_member,abnormal_household,person_id,age,gender_id,gender,"
+              "role_household_type_id,role_household_type,industry_type_id,industry_type,employment_type_id,"
+              "employment_type,company_size_id,company_size,total_income,extraversion,sociability,assertiveness,"
+              "energy_level,agreeableness,compassion,respectfulness,trust,conscientiousness,organization,productivity,"
+              "responsibility,neuroticism,anxiety,depression,emotional_volatility,openness,intellectual_curiosity,"
+              "aesthetic_sensitivity,creative_imagination");
+
+    // 個性はチェックポイントの最終状態と float として完全に一致し、ドメイン得点は下位特性3つの平均
+    json cp = checkpoint(c);
+    std::ifstream pop(dir / "population.csv");
+    std::string pop_line;
+    std::getline(pop, pop_line);
+    std::string line;
+    int row = 0;
+    while (std::getline(f, line)) {
+        std::vector<std::string> v;
+        std::stringstream ss(line);
+        std::string item;
+        while (std::getline(ss, item, ',')) v.push_back(item);
+        if (!line.empty() && line.back() == ',') v.push_back("");
+        ASSERT_EQ(v.size(), 46u) << line;
+
+        // 元の26列は引用符を外しただけで同じ
+        std::getline(pop, pop_line);
+        std::string unquoted;
+        for (char ch : pop_line) if (ch != '"') unquoted += ch;
+        std::string first26;
+        for (int i = 0; i < 26; ++i) first26 += (i ? "," : "") + v[i];
+        EXPECT_EQ(first26, unquoted);
+
+        const auto& facets = cp["personality"][row];
+        EXPECT_EQ(std::to_string(facets["person_id"].get<int>()), v[13]);
+        const auto fv = facets["facets"].get<std::vector<float>>();  // N, C, E, A, O の順
+        auto at = [&](int col) { return std::stof(v[col]); };
+        // CSV の並び：E(26..29) A(30..33) C(34..37) N(38..41) O(42..45)
+        EXPECT_EQ(at(27), fv[6]); EXPECT_EQ(at(28), fv[7]); EXPECT_EQ(at(29), fv[8]);
+        EXPECT_EQ(at(31), fv[9]); EXPECT_EQ(at(32), fv[10]); EXPECT_EQ(at(33), fv[11]);
+        EXPECT_EQ(at(35), fv[3]); EXPECT_EQ(at(36), fv[4]); EXPECT_EQ(at(37), fv[5]);
+        EXPECT_EQ(at(39), fv[0]); EXPECT_EQ(at(40), fv[1]); EXPECT_EQ(at(41), fv[2]);
+        EXPECT_EQ(at(43), fv[12]); EXPECT_EQ(at(44), fv[13]); EXPECT_EQ(at(45), fv[14]);
+        EXPECT_EQ(at(26), (fv[6] + fv[7] + fv[8]) / 3.0f);
+        EXPECT_EQ(at(38), (fv[0] + fv[1] + fv[2]) / 3.0f);
+        ++row;
+    }
+    EXPECT_EQ(row, 12);
+
+    // チェックポイントから書き出しても同じ内容になる
+    const std::string exported = exportPersonalityFromCheckpoint(c, (dir / "exported.csv").string());
+    std::ifstream a(out), b(exported);
+    std::stringstream sa, sb;
+    sa << a.rdbuf();
+    sb << b.rdbuf();
+    EXPECT_EQ(sa.str(), sb.str());
+    EXPECT_EQ(exportPersonalityFromCheckpoint(c), out.string());
 }

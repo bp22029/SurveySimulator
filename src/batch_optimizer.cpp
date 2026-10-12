@@ -9,6 +9,7 @@
 #include <fstream>
 #include <iomanip>
 #include <iostream>
+#include <limits>
 #include <regex>
 #include <set>
 #include <sstream>
@@ -491,6 +492,114 @@ void writePopulationCsv(const std::string& path, const std::vector<Person>& popu
 
 namespace {
 
+// 引用符で囲まれたフィールドに対応した CSV の1行の分割（"" は " 1文字）
+std::vector<std::string> splitCsvLine(const std::string& line) {
+    std::vector<std::string> fields;
+    std::string field;
+    bool quoted = false;
+    for (size_t i = 0; i < line.size(); ++i) {
+        const char ch = line[i];
+        if (quoted) {
+            if (ch == '"' && i + 1 < line.size() && line[i + 1] == '"') {
+                field += '"';
+                ++i;
+            } else if (ch == '"') {
+                quoted = false;
+            } else {
+                field += ch;
+            }
+        } else if (ch == '"') {
+            quoted = true;
+        } else if (ch == ',') {
+            fields.push_back(field);
+            field.clear();
+        } else {
+            field += ch;
+        }
+    }
+    fields.push_back(field);
+    return fields;
+}
+
+// カンマ・引用符・改行を含む値だけ引用符で囲む
+std::string csvField(const std::string& v) {
+    if (v.find_first_of(",\"\n") == std::string::npos) return v;
+    std::string out = "\"";
+    for (char ch : v) out += ch == '"' ? std::string("\"\"") : std::string(1, ch);
+    return out + "\"";
+}
+
+} // namespace
+
+void writeSyntheticPopulationWithBfi2(const std::string& population_csv, const std::vector<Person>& population,
+                                      const std::string& out_path) {
+    std::map<int, const Person*> by_id;
+    for (const auto& p : population) by_id[p.person_id] = &p;
+
+    std::istringstream in(readFile(population_csv));
+    std::string line;
+    if (!std::getline(in, line)) throw std::runtime_error(population_csv + " is empty");
+    const std::vector<std::string> header = splitCsvLine(line);
+    size_t id_col = header.size();
+    for (size_t i = 0; i < header.size(); ++i) {
+        if (header[i] == "person_id") id_col = i;
+    }
+    if (id_col == header.size()) throw std::runtime_error(population_csv + " has no person_id column");
+
+    std::ostringstream os;
+    for (size_t i = 0; i < header.size(); ++i) os << (i ? "," : "") << csvField(header[i]);
+    os << ",extraversion,sociability,assertiveness,energy_level"
+       << ",agreeableness,compassion,respectfulness,trust"
+       << ",conscientiousness,organization,productivity,responsibility"
+       << ",neuroticism,anxiety,depression,emotional_volatility"
+       << ",openness,intellectual_curiosity,aesthetic_sensitivity,creative_imagination\n";
+    os << std::setprecision(std::numeric_limits<float>::max_digits10);
+
+    size_t n_rows = 0;
+    while (std::getline(in, line)) {
+        if (line.empty()) continue;
+        const std::vector<std::string> fields = splitCsvLine(line);
+        if (fields.size() != header.size()) {
+            throw std::runtime_error(population_csv + ": row " + std::to_string(n_rows + 1) + " has " +
+                                     std::to_string(fields.size()) + " fields, expected " +
+                                     std::to_string(header.size()));
+        }
+        const int person_id = std::stoi(fields[id_col]);
+        auto it = by_id.find(person_id);
+        if (it == by_id.end()) throw std::runtime_error("no personality for person_id " + fields[id_col]);
+        for (size_t i = 0; i < fields.size(); ++i) os << (i ? "," : "") << csvField(fields[i]);
+        const auto& b = it->second->personality;
+        for (float v : {b.extraversion.score, b.extraversion.sociability, b.extraversion.assertiveness,
+                        b.extraversion.energy_level,
+                        b.agreeableness.score, b.agreeableness.compassion, b.agreeableness.respectfulness,
+                        b.agreeableness.trust,
+                        b.conscientiousness.score, b.conscientiousness.organization, b.conscientiousness.productivity,
+                        b.conscientiousness.responsibility,
+                        b.neuroticism.score, b.neuroticism.anxiety, b.neuroticism.depression,
+                        b.neuroticism.emotional_volatility,
+                        b.openness.score, b.openness.intellectual_curiosity, b.openness.aesthetic_sensitivity,
+                        b.openness.creative_imagination}) {
+            os << "," << v;
+        }
+        os << "\n";
+        ++n_rows;
+    }
+    if (n_rows != population.size()) {
+        throw std::runtime_error(population_csv + " has " + std::to_string(n_rows) + " persons, but the population has " +
+                                 std::to_string(population.size()));
+    }
+    writeFileAtomic(out_path, os.str());
+}
+
+std::string personalityCsvName(const std::string& model, const std::string& client_id, int sweep) {
+    const std::string short_model = model.substr(model.find_last_of('/') == std::string::npos ? 0
+                                                                                              : model.find_last_of('/') + 1);
+    return "synthetic_population_with_bfi2_" + (short_model.empty() ? std::string("unknown-model") : short_model) +
+           "_" + client_id + "_sweep" + sweepTag(sweep) + ".csv";
+}
+
+namespace {
+
 void writeSweepOutputs(const BatchOptimizerConfig& c, int sweep, const RunState& s,
                        const std::vector<Question>& questions, const std::vector<Decision>& decisions) {
     const fs::path dir = fs::path(c.run_dir) / "sweeps";
@@ -661,4 +770,20 @@ void runBatchOptimization(const BatchOptimizerConfig& c, JobClient& client,
     }
     std::cout << "Optimization finished: " << c.sweeps << " sweeps, TAE=" << std::setprecision(10)
               << tracker.total() << std::endl;
+
+    // 今後の実験に使う形の CSV（合成人口の元の列 ＋ 最適化した個性）
+    const fs::path out = fs::path(c.run_dir) / personalityCsvName(s.server.value("model", ""), c.client_id, c.sweeps);
+    writeSyntheticPopulationWithBfi2(c.population_csv, s.population, out.string());
+    std::cout << "Wrote " << out.string() << std::endl;
+}
+
+std::string exportPersonalityFromCheckpoint(const BatchOptimizerConfig& c, const std::string& out_path) {
+    const OptimizerInputs in = loadOptimizerInputs(c);
+    RunState s;
+    if (!loadCheckpoint(c, s, in.population)) throw std::runtime_error("no checkpoint in " + c.run_dir);
+    const std::string out = out_path.empty()
+        ? (fs::path(c.run_dir) / personalityCsvName(s.server.value("model", ""), c.client_id, s.completed_sweep)).string()
+        : out_path;
+    writeSyntheticPopulationWithBfi2(c.population_csv, s.population, out);
+    return out;
 }

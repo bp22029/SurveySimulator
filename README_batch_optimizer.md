@@ -86,6 +86,14 @@ SA の初期温度・終了温度は、昨年度と同じく山田らの方法�
 | `sweeps/sweep_NNN_decisions.csv` | その周の1人ごとの判定（順番、ΔTAE、採否、温度） |
 | `sweeps/sweep_NNN_population.csv` | その周の後の個性と回答（昨年の merged_population と同じ列構成） |
 | `server_info_*.json` | 起動ごとに記録したサーバー情報（`GET /info`） |
+| `synthetic_population_with_bfi2_<モデル名>_<client_id>_sweepNNN.csv` | **今後の実験に使う形**。最後の周まで終わると書く。合成人口の CSV の元の26列（同じ並び、引用符なし）の後ろに、最適化した個性20列（E・A・C・N・O の順にドメイン得点と下位特性3つ）。昨年の `synthetic_population_with_bfi2.csv`（Qwen3-14B）と同じ列。値は float を正確に復元できる9桁 |
+
+途中の周の個性を同じ形で取り出すときは（サーバーには接続しない。最適化の実行中でもよい）：
+
+```bash
+./build/src/ExportPersonality my_config.json              # run_dir に ..._sweepNNN.csv（NNN は完了している最後の周）
+./build/src/ExportPersonality my_config.json out.csv      # 出力先を指定
+```
 
 ## 再現性のために
 
